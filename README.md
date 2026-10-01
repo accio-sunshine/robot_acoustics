@@ -28,13 +28,14 @@ robot-audio/
 ├── make_hark_xml.py          mic/source geometry for HARKTOOL5
 ├── pyhark_localize.py        HARK localization + separation
 ├── check_setup.py            Phase 0 environment check
-├── experiments/              exp01–exp05, each a small settings file
+├── experiments/              exp01–exp06, each a small settings file
 ├── voices/                   male.wav, female.wav, baby.wav (inputs for sim_conversation.py)
 ├── hark/                     mic_positions.xml, source_positions.xml
 ├── speech_cache/             CMU Arctic clips downloaded on first run
 ├── results/                  one folder per experiment (baseline outputs)
 ├── sim_noise_out/            robot-noise scenes + motor_state.csv
-└── sim_conversation_out/     conversation scenes
+├── sim_conversation_out/     conversation scenes
+└── web/array_bench.html      interactive version with all scene knobs (open in a browser)
 ```
 
 ## Scripts
@@ -66,6 +67,7 @@ python experiments/exp01_echo_levels.py
 | `exp02_array_size` | Array radius | 3, 5, 10 cm |
 | `exp03_background_noise` | Background SNR | 25, 15, 5 dB |
 | `exp04_talker_spacing` | Talker B direction | one talker, 110°, 50°, 30° apart |
+| `exp06_talker_distance` | Talker distance | 0.75, 1.5, 2.25 m |
 | `exp05_test_set` | Fixed test set reused by every later phase. **Don't change it**; add a new experiment instead. | one_talker, two_far, two_close, dry_room, echoey_room |
 
 Each scene folder holds the 8-channel mix, mic-1 input, delay-and-sum, MVDR, WPE and
@@ -89,6 +91,30 @@ What the baseline shows:
 - MVDR beats delay-and-sum whenever there are two talkers; its gain drops from 6.4 to 3.3 dB as echo goes from 0.2 to 0.8 s.
 - Talkers 30° apart are hard to separate with a 5 cm array (MVDR only 2.3 dB).
 - With a single talker, MVDR (8.9 dB) is far below delay-and-sum (23.1 dB), which points to self-cancellation in the MPDR form and is worth investigating.
+
+### Experiment 6: talker distance
+
+| Scene | MUSIC ° | SRP-PHAT ° | Mic 1 dB | DAS dB | MVDR dB |
+|---|---|---|---|---|---|
+| d075_close (0.75 m) | 33, 41 | 40, 147 | 3.7 | 4.3 | 6.3 |
+| d150_medium (1.5 m) | 41, 332 | 37, 155 | 2.3 | 3.2 | 4.9 |
+| d225_far (2.25 m) | 43, 335 | 38, 147 | 0.1 | 0.6 | 4.3 |
+
+Moving the talkers away costs mic 1 and delay-and-sum about 3.6 dB from 0.75 m to 2.25 m. MVDR loses only 2 dB.
+SRP-PHAT stays accurate at every distance.
+
+## Interactive bench
+
+`web/array_bench.html` is a browser version of `sim_8mic_room.py` with every scene setting as a slider:
+RT60, SNR, room size, array radius, talker directions and distance, plus page-only knobs for the number of
+mics and the DOA frequency band. Results update instantly, you can click the room plan to move a talker,
+and each experiment scene is a preset that shows the Python result next to the page's estimate.
+It also builds the `dict(...)` line to paste into a new experiment.
+
+It uses a lighter room model (exact reflections up to 2 bounces, statistical late echo, measured speech
+spectra). Against every experiment scene, mic-1 and delay-and-sum scores land within about 0.5 dB of
+Python in most scenes, MVDR within about 1.5 dB, and SRP-PHAT within a few degrees. Use it to choose
+scenes, then confirm in Python.
 
 ## Typical workflow
 
