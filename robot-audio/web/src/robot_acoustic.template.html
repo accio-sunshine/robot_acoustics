@@ -44,6 +44,13 @@ h3 { font-size: .8rem; margin: 0; font-weight: 600; text-transform: uppercase; l
 section { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 12px; min-width: 0; align-content: start; }
 .top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 880px) { .top { grid-template-columns: minmax(0, 1fr); } }
+.intro { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 24px; }
+@media (max-width: 880px) { .intro { grid-template-columns: minmax(0, 1fr); } }
+.intro p { margin: 6px 0 0; max-width: 62ch; color: var(--soft); }
+.purpose p:first-of-type { color: var(--ink); }
+.steps { margin: 8px 0 0; padding-left: 22px; display: grid; gap: 7px; color: var(--soft); max-width: 70ch; }
+.steps b { color: var(--ink); font-weight: 600; }
+.steps li::marker { color: var(--mic); font-weight: 700; }
 .lists { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 880px) { .lists { grid-template-columns: minmax(0, 1fr); } }
 
@@ -144,8 +151,27 @@ code { font-family: var(--mono); font-size: .82em; }
 <main>
   <header>
     <h1>Robot Acoustic</h1>
-    <p class="lead">The world as the robot hears it. A man says “Hi there, how are you doing today?”, a woman answers, and a baby cries while the robot's fan, servos and electronics make their own noise. Change any sound, move the people around the robot, then listen to each microphone, each beamformer and each sound on its own.</p>
+    <p class="lead">The world as a robot with 8 microphones on its head hears it. A man says “Hi there, how are you doing today?”, a woman answers “I'm good. What is the plan for the day?”, and a baby cries, while the robot's own fan, servos and electronics add noise right next to its microphones.</p>
   </header>
+
+  <section class="intro" aria-labelledby="h-intro">
+    <div class="purpose">
+      <h2 id="h-intro">What this page is for</h2>
+      <p>To hear and measure how well the robot can pick out one person's voice when other people, a baby and its own body are making noise. It simulates the robot's 8 microphones for whatever scene you set up, then runs the same processing as the Python scripts. That means direction finding (where is each sound?) and beamforming, which combines the 8 microphones to focus on one speaker.</p>
+      <p>Use it to try ideas quickly, such as a louder fan, a person standing closer or a more echoey room, by ear and by score, before running the full Python simulation.</p>
+    </div>
+    <div>
+      <h2>How to use it</h2>
+      <ol class="steps">
+        <li><b>Pick a scene.</b> Under Knobs, start with Baby crying, Baby + fan, Robot moving or Quiet room.</li>
+        <li><b>Change the sounds.</b> Switch robot noises on or off and set their loudness, move the baby, and change the room echo. You can also drag the man (M), woman (W) and baby (B) around the robot's head. The page re-renders the 8 microphones in a few seconds.</li>
+        <li><b>Listen to the raw microphones.</b> Press Play selected mics. Click microphones on the head to choose which ones you hear, and use Stereo with headphones to hear left and right.</li>
+        <li><b>Compare the processing.</b> Under Pick out each speaker, play Mic 1 alone, then the beamformers aimed at the man or the woman. The dB score is the target voice against everything else, so higher means cleaner.</li>
+        <li><b>Look at the sound.</b> Clicking any row shows its waveform and spectrogram under the timeline. Click the picture to play from that moment.</li>
+        <li><b>Check against Python.</b> Play the Python recordings, and compare the page's scores with the Python numbers shown for the Baby crying and Baby + fan scenes.</li>
+      </ol>
+    </div>
+  </section>
 
   <div class="top">
     <section aria-labelledby="h-head">
@@ -356,7 +382,7 @@ function drawHead() {
   const svg = $("head"); svg.textContent = "";
   for (const d of [1, 2, 3]) {
     el("circle", { cx: 0, cy: 0, r: R(d), fill: "none", stroke: "var(--line)", "stroke-dasharray": "3 6" }, svg);
-    el("text", { x: 4, y: -R(d) - 4, "font-size": 11, fill: "var(--soft)" }, svg, d + " m");
+    { const [lx, ly] = pt(-62, R(d) + 6); el("text", { x: lx, y: ly + 4, "font-size": 11, fill: "var(--soft)" }, svg, d + " m"); }
   }
   for (const a of [0, 90, 180, 270]) { const [x, y] = pt(a, 232); el("text", { x, y: y + 4, "text-anchor": "middle", "font-size": 11, fill: "var(--soft)" }, svg, a + "°"); }
   // SRP estimates
