@@ -1,0 +1,10 @@
+exp03_background_noise
+How does background noise level affect direction finding and beamforming?
+
+       scene | RT60 s | radius cm | SNR dB | true deg | MUSIC deg | SRP deg | mic dB | DAS dB | MVDR dB
+-------------+--------+-----------+--------+----------+-----------+---------+--------+--------+--------
+ snr25_quiet |    0.5 |       5.0 |     25 |   40 150 |    42 332 |  36 158 |    2.6 |    3.3 |     6.1
+snr15_medium |    0.5 |       5.0 |     15 |   40 150 |    41 332 |  37 155 |    2.3 |    3.2 |     4.9
+  snr05_loud |    0.5 |       5.0 |      5 |   40 150 |    51 335 |  38 150 |   -0.1 |    2.7 |     2.8
+
+dB columns: talker A vs everything else (higher = cleaner). DAS = delay-and-sum, MVDR = MVDR beamformer.

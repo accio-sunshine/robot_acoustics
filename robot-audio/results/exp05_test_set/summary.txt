@@ -1,0 +1,12 @@
+exp05_test_set
+Fixed scenes that every later phase is measured on.
+
+      scene | RT60 s | radius cm | SNR dB | true deg | MUSIC deg | SRP deg | mic dB | DAS dB | MVDR dB
+------------+--------+-----------+--------+----------+-----------+---------+--------+--------+--------
+ one_talker |    0.5 |       5.0 |     15 |       40 |        28 |      38 |   15.0 |   23.1 |     8.9
+    two_far |    0.5 |       5.0 |     15 |   40 150 |    41 332 |  37 155 |    2.3 |    3.2 |     4.9
+  two_close |    0.5 |       5.0 |     15 |    40 70 |     42 53 |  46 162 |    0.8 |    1.1 |     2.3
+   dry_room |    0.2 |       5.0 |     15 |   40 150 |     20 32 |  40 147 |    2.2 |    3.7 |     6.4
+echoey_room |    0.8 |       5.0 |     15 |   40 150 |    39 323 |  32 161 |    2.2 |    3.0 |     3.3
+
+dB columns: talker A vs everything else (higher = cleaner). DAS = delay-and-sum, MVDR = MVDR beamformer.

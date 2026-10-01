@@ -1,0 +1,4 @@
+scene,RT60 s,radius cm,SNR dB,true deg,MUSIC deg,SRP deg,mic dB,DAS dB,MVDR dB
+rt02_dry,0.2,5.0,15,40 150,20 32,40 147,2.2,3.7,6.4
+rt05_medium,0.5,5.0,15,40 150,41 332,37 155,2.3,3.2,4.9
+rt08_echoey,0.8,5.0,15,40 150,39 323,32 161,2.2,3.0,3.3
