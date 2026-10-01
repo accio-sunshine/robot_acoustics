@@ -1,0 +1,58 @@
+# Publishes the interactive pages to GitHub Pages on every push to main.
+#   /                    -> robot-audio/web/robot_acoustic.html (Robot Acoustic)
+#   /array_bench.html    -> robot-audio/web/array_bench.html (8-Mic Array Bench)
+#   /audio/...           -> the Python recordings the Robot Acoustic page plays
+name: Publish pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build the Robot Acoustic page
+        run: python robot-audio/web/build.py
+      - name: Assemble the site
+        run: |
+          mkdir -p _site/audio
+          cp robot-audio/web/robot_acoustic.html _site/index.html
+          cp robot-audio/web/array_bench.html _site/array_bench.html
+          python - <<'PY'
+          import json, shutil, os
+          files = json.load(open("robot-audio/web/src/published_files.json"))
+          for dest, src in files.items():
+              os.makedirs(os.path.dirname(os.path.join("_site", dest)), exist_ok=True)
+              shutil.copy(src, os.path.join("_site", dest))
+          print(f"copied {len(files)} audio files")
+          PY
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

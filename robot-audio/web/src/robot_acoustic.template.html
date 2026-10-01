@@ -1,0 +1,991 @@
+<meta charset="utf-8">
+<title>Robot Acoustic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: the robot's head at the centre of its own world on the left, its knobs on the right,
+   then a full-width viewer (timeline, waveform, spectrogram) and the lists of things to hear. */
+:root {
+  --bg: #EEF1F4; --panel: #FFFFFF; --ink: #1D2733; --soft: #5B6876; --line: #D3DAE2; --head: #E2E7ED;
+  --mic: #2F6FB0; --micoff: #B9C3CE; --a: #C8891A; --b: #2A8C82; --baby: #B5527A;
+  --noise: #6A5ACD; --srp: #C0392B; --wave: #2F6FB0;
+  --spec0: #F4F6F9; --spec1: #2F6FB0; --spec2: #1D2733;
+  --good: #1E7B45; --bad: #B3261E;
+  --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141A21; --panel: #1C242D; --ink: #E6EBF0; --soft: #9AA7B4; --line: #2E3946; --head: #242E39;
+    --mic: #6FA6E0; --micoff: #3C4856; --a: #E0A643; --b: #4DB8AC; --baby: #D9789E;
+    --noise: #A397F0; --srp: #FF7A6B; --wave: #6FA6E0;
+    --spec0: #161D25; --spec1: #3F7FC4; --spec2: #F2E9C8;
+    --good: #5FCF86; --bad: #FF8A80;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141A21; --panel: #1C242D; --ink: #E6EBF0; --soft: #9AA7B4; --line: #2E3946; --head: #242E39;
+  --mic: #6FA6E0; --micoff: #3C4856; --a: #E0A643; --b: #4DB8AC; --baby: #D9789E;
+  --noise: #A397F0; --srp: #FF7A6B; --wave: #6FA6E0;
+  --spec0: #161D25; --spec1: #3F7FC4; --spec2: #F2E9C8;
+  --good: #5FCF86; --bad: #FF8A80;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+main { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; display: grid; gap: 20px; }
+h1 { font-size: 2rem; line-height: 1.15; margin: 0; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+.lead { color: var(--soft); margin: 0; font-size: 1.02rem; }
+h2 { font-size: 1.1rem; margin: 0; font-weight: 600; }
+h3 { font-size: .8rem; margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--soft); }
+.hint { color: var(--soft); font-size: .88rem; margin: 0; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 12px; min-width: 0; align-content: start; }
+.top { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 20px; align-items: stretch; }
+@media (max-width: 880px) { .top { grid-template-columns: minmax(0, 1fr); } }
+.intro { gap: 14px; }
+.intro-top { display: grid; gap: 8px; }
+.intro-top p:last-child { margin: 0; }
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: st; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 880px) { .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .steps { grid-template-columns: minmax(0, 1fr); } }
+.steps li { counter-increment: st; background: var(--bg); border-radius: 10px; padding: 12px 14px 12px 48px; position: relative; display: grid; gap: 2px; align-content: start; }
+.steps li::before { content: counter(st); position: absolute; left: 14px; top: 12px; width: 24px; height: 24px; border-radius: 50%; background: var(--mic); color: #fff; font-weight: 700; font-size: .8rem; display: grid; place-items: center; }
+.steps b { font-weight: 600; }
+.steps span { color: var(--soft); font-size: .88rem; }
+.about { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 880px) { .about { grid-template-columns: minmax(0, 1fr); } }
+.about > div { display: grid; gap: 4px; align-content: start; }
+.about p { margin: 0; color: var(--soft); font-size: .88rem; }
+.lists { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 880px) { .lists { grid-template-columns: minmax(0, 1fr); } }
+
+/* head */
+#head { width: 100%; max-width: 480px; height: auto; display: block; margin: 0 auto; touch-action: none; }
+#head text { font-family: var(--sans); }
+.person { cursor: grab; }
+.person:active { cursor: grabbing; }
+.mic, .chip { cursor: pointer; }
+.mic:focus-visible circle, .chip:focus-visible rect, .person:focus-visible circle { stroke: var(--ink); stroke-width: 3; }
+:is(.mic, .chip, .person):focus { outline: none; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: .82rem; color: var(--soft); justify-content: center; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+.legend .tri::before { border-radius: 0; clip-path: polygon(50% 100%, 0 0, 100% 0); }
+.legend .box::before { border-radius: 3px; background: none; border: 1.5px dashed var(--c); width: 12px; height: 9px; }
+.hears { font-size: .9rem; color: var(--soft); text-align: center; margin: 0; font-variant-numeric: tabular-nums; }
+.hears b { color: var(--ink); font-weight: 600; }
+
+/* buttons */
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font: inherit; font-size: .9rem; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 7px 13px; border-radius: 999px; cursor: pointer; }
+button:hover { border-color: var(--mic); }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--mic); outline-offset: 2px; }
+button.primary { background: var(--mic); border-color: var(--mic); color: #fff; font-weight: 600; }
+button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+button:disabled { opacity: .5; cursor: default; }
+
+/* knobs */
+.knobs { display: grid; gap: 16px; }
+@media (min-width: 1080px) { .knobs { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 24px; align-items: start; }
+  .kcol { display: grid; gap: 16px; align-content: start; } }
+.kcol { display: grid; gap: 16px; align-content: start; }
+.kgroup { display: grid; gap: 10px; }
+.kgroup + .kgroup { border-top: 1px solid var(--line); padding-top: 14px; }
+.kgroup .hint { margin-top: -4px; }
+.knob { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 10px; align-items: baseline; }
+.knob label { font-weight: 500; font-size: .92rem; }
+.knob output { font-family: var(--mono); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.knob input[type=range] { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; accent-color: var(--mic); }
+.noise { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0 10px; align-items: center; }
+.noise input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--noise); margin: 0; }
+.noise label { font-weight: 500; font-size: .92rem; }
+.noise label small { color: var(--soft); font-weight: 400; white-space: nowrap; }
+.noise output { font-family: var(--mono); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.noise input[type=range] { grid-column: 2 / -1; width: 100%; accent-color: var(--noise); margin: 0; }
+.noise.off label, .noise.off output { color: var(--soft); }
+.noise.off input[type=range] { opacity: .45; }
+.sub { grid-column: 2 / -1; }
+.sub .knob input[type=range] { accent-color: var(--noise); }
+.check { display: flex; gap: 8px; align-items: center; font-weight: 500; font-size: .92rem; }
+.check input { width: 17px; height: 17px; accent-color: var(--baby); margin: 0; }
+
+/* status */
+.status { display: flex; gap: 10px; align-items: center; font-size: .88rem; color: var(--soft); min-height: 1.6em; }
+.spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--mic); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* viewer */
+.vhead { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.vtitle { display: grid; gap: 2px; min-width: 0; }
+.vtitle b { font-size: 1.05rem; }
+.vtitle span { color: var(--soft); font-size: .88rem; }
+.time { font-family: var(--mono); font-size: .85rem; color: var(--soft); font-variant-numeric: tabular-nums; }
+.viewer { position: relative; }
+#tl { width: 100%; height: auto; display: block; }
+#tl text { font-family: var(--sans); }
+.plots { position: relative; padding-left: 13.333%; padding-right: 2.222%; display: grid; gap: 6px; cursor: crosshair; }
+.plots canvas { width: 100%; display: block; border-radius: 4px; background: var(--spec0); }
+#wave { height: 84px; }
+#spec { height: 170px; }
+.plabel { position: absolute; left: 0; width: 12.5%; text-align: right; font-size: .78rem; color: var(--soft); line-height: 1.2; }
+.playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); pointer-events: none; opacity: 0; }
+
+/* track lists */
+ol.tracks { list-style: none; margin: 0; padding: 0; }
+ol.tracks li { display: flex; gap: 12px; align-items: center; padding: 10px 6px; border-top: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+ol.tracks li:first-child, ol.tracks li.subrow, ol.tracks li.subrow + li { border-top: 0; }
+ol.tracks li.subrow { cursor: default; padding: 8px 6px 0; }
+ol.tracks li.subrow:hover { background: none; }
+ol.tracks.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
+ol.tracks.grid2 li:nth-child(2) { border-top: 0; }
+ol.tracks.grid2 li { padding-block: 8px; }
+@media (max-width: 560px) { ol.tracks.grid2 { grid-template-columns: minmax(0, 1fr); } ol.tracks.grid2 li:nth-child(2) { border-top: 1px solid var(--line); } }
+ol.tracks li:hover { background: var(--bg); }
+ol.tracks li.sel { background: var(--bg); box-shadow: inset 3px 0 0 var(--mic); }
+.badge { flex: 0 0 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: .8rem; color: #fff; background: var(--c, var(--soft)); }
+.tt { flex: 1; min-width: 0; }
+.tt b { display: block; font-weight: 600; font-size: .95rem; }
+.tt span { color: var(--soft); font-size: .84rem; overflow-wrap: anywhere; }
+.score { flex: 0 0 72px; text-align: right; font-size: .82rem; color: var(--soft); font-variant-numeric: tabular-nums; line-height: 1.3; }
+.score b { color: var(--ink); font-weight: 600; font-size: .95rem; }
+.score .py { display: block; font-family: var(--mono); font-size: .74rem; }
+.play { flex: 0 0 auto; width: 38px; height: 38px; padding: 0; display: grid; place-items: center; }
+.play svg { width: 13px; height: 13px; }
+.lgroup { display: grid; gap: 6px; }
+.lgroup + .lgroup { margin-top: 2px; }
+details.lgroup { border-top: 1px solid var(--line); padding-top: 10px; }
+details.lgroup summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+details.lgroup summary::-webkit-details-marker { display: none; }
+details.lgroup summary::after { content: "+"; font-weight: 600; color: var(--soft); font-size: 1.1rem; line-height: 1; }
+details.lgroup[open] summary::after { content: "−"; }
+details.lgroup summary small { white-space: nowrap; margin-left: auto; color: var(--soft); font-size: .78rem; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.subhead { margin: 10px 0 2px; }
+.err { color: var(--bad); font-size: .84rem; margin: 0; }
+.tablewrap { overflow-x: auto; }
+#scoreTable { border-collapse: collapse; width: 100%; min-width: 560px; font-variant-numeric: tabular-nums; font-size: .9rem; }
+#scoreTable th, #scoreTable td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+#scoreTable th:first-child, #scoreTable td:first-child { text-align: left; white-space: normal; }
+#scoreTable thead th { font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--soft); font-weight: 600; }
+#scoreTable thead tr:first-child th { border-bottom: 2px solid currentColor; padding-bottom: 6px; text-align: center; }
+#scoreTable thead tr:first-child th:first-child { border-bottom: 0; }
+#scoreTable col.c-proc { width: 28%; }
+#scoreTable .g { border-left: 1px solid var(--line); }
+#scoreTable .who-a { color: var(--a); } #scoreTable .who-b { color: var(--b); }
+#scoreTable td.py { color: var(--soft); font-family: var(--mono); font-size: .82rem; }
+#scoreTable tr.orig td { background: var(--bg); }
+#scoreTable td b { font-weight: 600; }
+.dl { flex: 0 0 auto; width: 38px; height: 38px; padding: 0; display: grid; place-items: center; }
+.dl svg { width: 14px; height: 14px; }
+.check-box { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 8px; }
+.check-box summary { cursor: pointer; font-weight: 600; font-size: .92rem; }
+.check-box[open] { gap: 10px; }
+#beepOut { font-family: var(--mono); font-size: .78rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+code { font-family: var(--mono); font-size: .82em; }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+</style>
+
+<main>
+  <section class="intro" aria-labelledby="h-title">
+    <div class="intro-top">
+      <h1 id="h-title">Robot Acoustic</h1>
+      <p class="lead">The world as a robot with 8 microphones on its head hears it. A man says “Hi there, how are you doing today?”, a woman answers “I'm good. What is the plan for the day?”, and a baby cries, while the robot's own fan, servos and electronics add noise right next to its microphones.</p>
+      <p><b>What this page is for:</b> to hear and measure how well the robot can pick out one person's voice when other people, a baby and its own body are making noise. It simulates the robot's 8 microphones for the scene you set up, then runs the same processing as the Python scripts: direction finding (where each sound comes from) and beamforming (combining the 8 microphones to focus on one speaker). Use it to try ideas quickly, such as a louder fan, a closer speaker or a more echoey room, before running the full Python simulation.</p>
+    </div>
+    <h2>How to use it</h2>
+    <ol class="steps">
+      <li><b>Pick a scene</b><span>Under Knobs, start with Baby crying, Baby + fan, Robot moving or Quiet room.</span></li>
+      <li><b>Change the sounds</b><span>Switch robot noises on or off, set their loudness, move the baby or change the echo. Drag M, W and B around the head. The mics re-render in a few seconds.</span></li>
+      <li><b>Listen to the raw mics</b><span>Press Play selected mics. Click mics on the head to choose which you hear. Use Stereo with headphones.</span></li>
+      <li><b>Compare the processing</b><span>Under Pick out each speaker, play Mic 1 alone, then the beamformers aimed at the man or the woman.</span></li>
+      <li><b>Look at the sound</b><span>Click any row to see its waveform and spectrogram. Click the picture to play from that moment.</span></li>
+      <li><b>Read the scores</b><span>The Scores table compares each method with the original (mic 1 alone) and with Python. Download any sound with ↓.</span></li>
+    </ol>
+  </section>
+
+  <div class="top">
+    <section aria-labelledby="h-head">
+      <h2 id="h-head">What the robot hears</h2>
+      <p class="hint">Top view, robot facing right (0°). Drag the man, woman or baby. Click a microphone to switch it on or off. Click a body part to switch its noise.</p>
+      <svg id="head" viewBox="-240 -240 480 480" role="group" aria-label="Robot head seen from above with microphones, noise sources and people"></svg>
+      <div class="legend">
+        <span style="--c: var(--a)">Man</span>
+        <span style="--c: var(--b)">Woman</span>
+        <span style="--c: var(--baby)">Baby</span>
+        <span class="box" style="--c: var(--noise)">Robot noise</span>
+        <span class="tri" style="--c: var(--srp)">Where the robot thinks sound comes from</span>
+      </div>
+      <p class="hears" id="hears"></p>
+      <div class="row">
+        <button class="primary" id="playMics">Play selected mics</button>
+        <button id="allOn">All 8 mics</button>
+        <button id="oneOn">Mic 1 only</button>
+        <button id="stereo" aria-pressed="false">Stereo for headphones</button>
+      </div>
+      <div class="status" id="status" aria-live="polite"></div>
+      <details class="check-box" id="soundCheck">
+        <summary>Can't hear anything? Run the sound check</summary>
+        <p class="hint">Each button plays a one-second beep a different way. Tell Claude which ones you hear and what the line under them says.</p>
+        <div class="row">
+          <button id="beep1">Beep 1: audio player</button>
+          <button id="beep2">Beep 2: embedded file</button>
+          <button id="beep3">Beep 3: Web Audio</button>
+        </div>
+        <p class="hint" id="beepOut" aria-live="polite"></p>
+      </details>
+    </section>
+
+    <section aria-labelledby="h-knobs">
+      <h2 id="h-knobs">Knobs</h2>
+      <div class="row" id="presets" role="group" aria-label="Scenes"></div>
+      <p class="hint" id="presetNote"></p>
+      <div class="knobs" id="knobs"></div>
+    </section>
+  </div>
+
+  <section aria-labelledby="h-scores">
+    <div class="vhead">
+      <h2 id="h-scores">Scores</h2>
+      <button id="dlAll" disabled>Download all audio + scores (.zip)</button>
+    </div>
+    <p class="hint">Each score is how much stronger the target voice is than everything else at that point, in dB. <b>The original</b> is Mic 1 alone: what one microphone hears with no processing. <b>Gain</b> is how much the processing improves on the original. +3 dB means the voice is about twice as strong relative to the noise, and +10 dB means ten times.</p>
+    <div class="tablewrap"><table id="scoreTable"></table></div>
+    <p class="hint" id="scoreNote"></p>
+  </section>
+
+  <section aria-labelledby="h-view">
+    <div class="vhead">
+      <div class="vtitle"><b id="vName">Mic 1 alone</b><span id="vDesc"></span></div>
+      <div class="row"><span class="time" id="vTime">0.00 / 5.50 s</span><button class="primary" id="vPlay">Play</button></div>
+    </div>
+    <div class="viewer" id="viewer">
+      <svg id="tl" viewBox="0 0 900 236" role="img" aria-label="Timeline of who is talking and what the robot is doing"></svg>
+      <div class="plots" id="plots">
+        <span class="plabel" style="top: 30px">Waveform</span>
+        <canvas id="wave" aria-label="Waveform of the selected sound"></canvas>
+        <span class="plabel" style="top: 150px">Spectrogram<br>0–8 kHz</span>
+        <canvas id="spec" aria-label="Spectrogram of the selected sound"></canvas>
+        <div class="playhead" id="ph"></div>
+      </div>
+    </div>
+    <p class="hint">Click a row below to view it here. Click the waveform or spectrogram to play from that moment.</p>
+  </section>
+
+  <div class="lists">
+    <section aria-labelledby="h-pick">
+      <h2 id="h-pick">Pick out each speaker</h2>
+      <p class="hint">Higher dB means a cleaner target voice. The Scores table above explains the numbers.</p>
+      <ol class="tracks" id="beamList"></ol>
+      <h3 style="margin-top: 8px">Each sound alone, at mic 1</h3>
+      <p class="hint">Normalised so you can hear its character.</p>
+      <ol class="tracks grid2" id="soloList"></ol>
+    </section>
+    <section aria-labelledby="h-py">
+      <h2 id="h-py">Python recordings</h2>
+      <p class="hint">The WAV files made by <code>sim_conversation.py</code> and <code>sim_8mic_robot_noise.py</code> with pyroomacoustics. Open one to compare it with the page's version.</p>
+      <div id="pyList"></div>
+    </section>
+  </div>
+
+  <section class="about" aria-label="About the simulation">
+    <div><h3>How the page makes the sound</h3><p>Same room (6 × 5 × 3 m), 8-mic ring, voices, robot noise recipes, levels and beamformers as the Python scripts. The room is lighter: exact wall reflections up to 3 bounces plus a statistical late echo. Scores land within about 0.5 dB of Python in the baby and fan scenes.</p></div>
+    <div><h3>Footsteps are approximate</h3><p>The page's beamformer cancels the footstep thump much less than Python does, so footsteps start switched off. Switch them on to hear them, but don't read too much into the scores.</p></div>
+    <div><h3>Loudness levels</h3><p>Every level is loudness at mic 1 compared with the man's voice, as in the scripts' <code>LEVEL_DB</code> and <code>BABY_DB</code>.</p></div>
+  </section>
+</main>
+
+<script id="engine">
+/*ENGINE*/
+</script>
+<script>
+"use strict";
+const VOICES = /*VOICES*/;
+const PY_FILES = /*PYFILES*/;
+
+// ---------------------------------------------------------------- state
+const DEF = { rt60: 0.5, radius: 5, roomDb: 25, manAng: 40, womanAng: 150, dist: 1.5,
+  babyOn: true, babyAng: 250, babyDist: 2.5, babyDb: -6,
+  fanOn: true, fanDb: -6, fanRpm: 4200, neckOn: true, neckDb: -4, shouldersOn: true, shouldersDb: -8,
+  footstepsOn: false, footstepsDb: -2, clicksOn: true, clicksDb: -10, humOn: true, humDb: -25 };
+const ROBOT_OFF = { fanOn: false, neckOn: false, shouldersOn: false, footstepsOn: false, clicksOn: false, humOn: false };
+// Python scores from sim_conversation.py for the matching scenes
+const PRESETS = [
+  { id: "baby", label: "Baby crying", set: { ...ROBOT_OFF }, desc: "Two people talking while a baby cries. The robot is still.",
+    py: { mic_man: -1.0, mic_woman: -1.0, man_mvdr: 4.7, woman_mvdr: 5.3 } },
+  { id: "fan", label: "Baby + fan", set: { ...ROBOT_OFF, fanOn: true, humOn: true }, desc: "Adds the cooling fan and 50 Hz electrical hum.",
+    py: { mic_man: -1.8, mic_woman: -1.8, man_mvdr: 4.5, woman_mvdr: 4.9, man_learned: 4.9, woman_learned: 4.7 } },
+  { id: "robot", label: "Robot moving", set: {}, desc: "Fan, hum, head turns, an arm gesture and brake clicks. Footsteps are parked (switched off).", py: null },
+  { id: "quiet", label: "Quiet room", set: { ...ROBOT_OFF, babyOn: false }, desc: "Just the two people and a faint room noise floor.", py: null },
+];
+let P = { ...DEF }, presetId = "robot";
+const deg = v => `${Math.round(v)}°`, m = v => `${v.toFixed(2)} m`, dB = v => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(0)} dB`;
+const NOISES = [
+  { k: "fan", label: "Cooling fan", where: "back of head", c: [-46, 0] },
+  { k: "neck", label: "Neck servo", where: "under the mics", c: [0, -20] },
+  { k: "shoulders", label: "Shoulder servos", where: "left shoulder", c: [0, -122], outside: true },
+  { k: "clicks", label: "Brake clicks", where: "joints", c: [0, 20] },
+  { k: "hum", label: "Electrical hum", where: "50 Hz", c: [40, -34] },
+  { k: "footsteps", label: "Footsteps", where: "approximate", c: [40, 34] },
+];
+const KNOBS = [
+  { title: "People", col: 0, items: [
+    { k: "manAng", label: "Man direction", min: 0, max: 359, step: 1, fmt: deg },
+    { k: "womanAng", label: "Woman direction", min: 0, max: 359, step: 1, fmt: deg },
+    { k: "dist", label: "Their distance from the robot", min: 0.5, max: 3, step: 0.05, fmt: m }] },
+  { title: "Baby", col: 0, toggle: "babyOn", items: [
+    { k: "babyDb", label: "Loudness", min: -24, max: 6, step: 1, fmt: dB },
+    { k: "babyAng", label: "Direction", min: 0, max: 359, step: 1, fmt: deg },
+    { k: "babyDist", label: "Distance", min: 0.5, max: 3, step: 0.05, fmt: m }] },
+  { title: "Robot noise", col: 1, noises: true },
+  { title: "Room and array", col: 1, items: [
+    { k: "rt60", label: "Echo time RT60", min: 0.2, max: 1.0, step: 0.05, fmt: v => v.toFixed(2) + " s" },
+    { k: "roomDb", label: "Room noise floor (vs man)", min: 5, max: 40, step: 1, fmt: v => `−${v} dB` },
+    { k: "radius", label: "Mic ring radius", min: 3, max: 10, step: 0.5, fmt: v => v.toFixed(1) + " cm" }] },
+];
+
+// ---------------------------------------------------------------- knobs UI
+const $ = id => document.getElementById(id);
+const inputs = {};
+function knobEl(def, parent) {
+  const d = document.createElement("div"); d.className = "knob";
+  d.innerHTML = `<label for="k_${def.k}">${def.label}</label><output id="o_${def.k}"></output><input type="range" id="k_${def.k}" min="${def.min}" max="${def.max}" step="${def.step}">`;
+  parent.appendChild(d);
+  const inp = d.querySelector("input");
+  inp.addEventListener("input", () => { P[def.k] = +inp.value; changed(); });
+  inputs[def.k] = { inp, out: d.querySelector("output"), fmt: def.fmt };
+}
+function buildKnobs() {
+  const root = $("knobs"), cols = [document.createElement("div"), document.createElement("div")];
+  cols.forEach(c => { c.className = "kcol"; root.appendChild(c); });
+  for (const g of KNOBS) {
+    const box = document.createElement("div"); box.className = "kgroup";
+    const h = document.createElement("h3"); h.textContent = g.title; box.appendChild(h);
+    if (g.toggle) {
+      const l = document.createElement("label"); l.className = "check";
+      l.innerHTML = `<input type="checkbox" id="k_${g.toggle}"> Baby crying`;
+      box.appendChild(l);
+      const cb = l.querySelector("input");
+      cb.addEventListener("change", () => { P[g.toggle] = cb.checked; changed(); });
+      inputs[g.toggle] = { cb };
+    }
+    if (g.noises) {
+      const p = document.createElement("p"); p.className = "hint"; p.textContent = "Loudness at mic 1 compared with the man's voice."; box.appendChild(p);
+      for (const n of NOISES) {
+        const d = document.createElement("div"); d.className = "noise"; d.id = "row_" + n.k;
+        d.innerHTML = `<input type="checkbox" id="k_${n.k}On" aria-label="${n.label} on"><label for="k_${n.k}Db">${n.label} <small>${n.where}</small></label><output id="o_${n.k}Db"></output><input type="range" id="k_${n.k}Db" min="-36" max="6" step="1">`;
+        box.appendChild(d);
+        const cb = d.querySelector("input[type=checkbox]"), rg = d.querySelector("input[type=range]");
+        cb.addEventListener("change", () => { P[n.k + "On"] = cb.checked; changed(); });
+        rg.addEventListener("input", () => { P[n.k + "Db"] = +rg.value; changed(); });
+        inputs[n.k + "On"] = { cb }; inputs[n.k + "Db"] = { inp: rg, out: d.querySelector("output"), fmt: dB };
+        if (n.k === "fan") { const s = document.createElement("div"); s.className = "sub"; d.appendChild(s);
+          knobEl({ k: "fanRpm", label: "Top speed", min: 2400, max: 6000, step: 100, fmt: v => v + " rpm" }, s); }
+      }
+    }
+    for (const it of g.items || []) knobEl(it, box);
+    cols[g.col].appendChild(box);
+  }
+  for (const pr of PRESETS) {
+    const b = document.createElement("button"); b.textContent = pr.label; b.dataset.id = pr.id;
+    b.addEventListener("click", () => { presetId = pr.id; P = { ...DEF, ...pr.set }; changed(true); });
+    $("presets").appendChild(b);
+  }
+}
+function syncKnobs() {
+  for (const k in inputs) {
+    const x = inputs[k];
+    if (x.cb) x.cb.checked = !!P[k];
+    if (x.inp) { x.inp.value = P[k]; x.out.textContent = x.fmt(P[k]); }
+  }
+  for (const n of NOISES) $("row_" + n.k).classList.toggle("off", !P[n.k + "On"]);
+  for (const b of $("presets").children) b.setAttribute("aria-pressed", b.dataset.id === presetId && presetMatches());
+  const pr = PRESETS.find(x => x.id === presetId);
+  $("presetNote").textContent = presetMatches() ? pr.desc : `Changed from “${pr.label}”.`;
+}
+function presetMatches() {
+  const pr = PRESETS.find(x => x.id === presetId), want = { ...DEF, ...pr.set };
+  return Object.keys(DEF).every(k => want[k] === P[k]);
+}
+
+// ---------------------------------------------------------------- head drawing (robot's view)
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text != null) e.textContent = text;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const R = d => 96 + 42 * d;                         // metres -> svg radius
+const pt = (a, r) => [r * Math.cos(a * Math.PI / 180), -r * Math.sin(a * Math.PI / 180)];
+let micOn = new Array(8).fill(true), drag = null, srpPeaks = [];
+function drawHead() {
+  const svg = $("head"); svg.textContent = "";
+  for (const d of [1, 2, 3]) {
+    el("circle", { cx: 0, cy: 0, r: R(d), fill: "none", stroke: "var(--line)", "stroke-dasharray": "3 6" }, svg);
+    { const [lx, ly] = pt(-62, R(d) + 6); el("text", { x: lx, y: ly + 4, "font-size": 11, fill: "var(--soft)" }, svg, d + " m"); }
+  }
+  for (const [a, anchor] of [[0, "end"], [90, "middle"], [180, "start"], [270, "middle"]]) { const [x, y] = pt(a, 234); el("text", { x, y: y + (a === 90 ? 10 : a === 270 ? 0 : -10), "text-anchor": anchor, "font-size": 11, fill: "var(--soft)" }, svg, a + "°"); }
+  // SRP estimates
+  for (const a of srpPeaks) {
+    const [x1, y1] = pt(a, 80), [x2, y2] = pt(a, 222);
+    el("line", { x1, y1, x2, y2, stroke: "var(--srp)", "stroke-width": 1.2, "stroke-dasharray": "2 4", opacity: 0.8 }, svg);
+    const t = a * Math.PI / 180, [tx, ty] = pt(a, 224);
+    const px = -Math.sin(t), py = -Math.cos(t);
+    el("path", { d: `M${tx - 9 * Math.cos(t) + 6 * px} ${ty + 9 * Math.sin(t) + 6 * py} L${tx} ${ty} L${tx - 9 * Math.cos(t) - 6 * px} ${ty + 9 * Math.sin(t) - 6 * py} Z`, fill: "var(--srp)",
+      transform: `rotate(0)` }, svg);
+  }
+  // head
+  el("circle", { cx: 0, cy: 0, r: 70, fill: "var(--head)", stroke: "var(--line)", "stroke-width": 1.5 }, svg);
+  el("path", { d: "M68 -12 L88 0 L68 12", fill: "var(--head)", stroke: "var(--line)", "stroke-width": 1.5 }, svg);
+  el("text", { x: 0, y: 56, "text-anchor": "middle", "font-size": 10, fill: "var(--soft)" }, svg, "robot head");
+  // people
+  const people = [["man", "M", P.manAng, P.dist, "var(--a)"], ["woman", "W", P.womanAng, P.dist, "var(--b)"]];
+  if (P.babyOn) people.push(["baby", "B", P.babyAng, P.babyDist, "var(--baby)"]);
+  for (const [id, letter, a, d, c] of people) {
+    const [lx, ly] = pt(a, 96), [x, y] = pt(a, R(d));
+    el("line", { x1: lx, y1: ly, x2: x, y2: y, stroke: c, "stroke-width": 2, "stroke-dasharray": "2 5" }, svg);
+    const g = el("g", { class: "person", tabindex: 0, role: "slider", "aria-label": `${id} direction`, "aria-valuenow": a, "data-id": id }, svg);
+    el("circle", { cx: x, cy: y, r: 17, fill: c }, g);
+    el("text", { x, y: y + 5, "text-anchor": "middle", "font-size": 14, "font-weight": 700, fill: "#fff", "pointer-events": "none" }, g, letter);
+    g.addEventListener("pointerdown", e => { drag = id; svg.setPointerCapture(e.pointerId); e.preventDefault(); });
+    g.addEventListener("keydown", e => {
+      const k = id === "man" ? "manAng" : id === "woman" ? "womanAng" : "babyAng";
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") { P[k] = (P[k] + 5) % 360; changed(); e.preventDefault(); }
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") { P[k] = (P[k] + 355) % 360; changed(); e.preventDefault(); }
+    });
+  }
+  // robot noise chips
+  for (const n of NOISES) {
+    const on = P[n.k + "On"], [x, y] = n.c;
+    const g = el("g", { class: "chip", tabindex: 0, role: "switch", "aria-checked": on, "aria-label": n.label }, svg);
+    el("rect", { x: x - 22, y: y - 10, width: 44, height: 20, rx: 5, fill: on ? "var(--noise)" : "var(--panel)", "fill-opacity": on ? 0.16 : 1,
+      stroke: on ? "var(--noise)" : "var(--micoff)", "stroke-width": 1.5, "stroke-dasharray": on ? "none" : "3 3" }, g);
+    el("text", { x, y: y + 4, "text-anchor": "middle", "font-size": 10.5, "font-weight": 600, fill: on ? "var(--noise)" : "var(--soft)", "pointer-events": "none" }, g,
+      { fan: "fan", neck: "neck", shoulders: "arm", clicks: "brakes", hum: "hum", footsteps: "feet" }[n.k]);
+    const toggle = () => { P[n.k + "On"] = !P[n.k + "On"]; changed(); };
+    g.addEventListener("click", toggle);
+    g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+  }
+  // microphones on the head rim
+  for (let i = 0; i < 8; i++) {
+    const [x, y] = pt(i * 45, 84);
+    const g = el("g", { class: "mic", tabindex: 0, role: "switch", "aria-checked": micOn[i], "aria-label": `Microphone ${i + 1}` }, svg);
+    el("circle", { cx: x, cy: y, r: 12, fill: micOn[i] ? "var(--mic)" : "var(--micoff)" }, g);
+    el("text", { x, y: y + 4, "text-anchor": "middle", "font-size": 11, "font-weight": 600, fill: "#fff", "pointer-events": "none" }, g, i + 1);
+    const t = () => { micOn[i] = !micOn[i]; drawHead(); updateMicMix(); };
+    g.addEventListener("click", t);
+    g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); t(); } });
+  }
+}
+function svgPoint(e) {
+  const svg = $("head"), p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
+  return p.matrixTransform(svg.getScreenCTM().inverse());
+}
+$("head").addEventListener("pointermove", e => {
+  if (!drag) return;
+  const q = svgPoint(e), a = Math.round(((Math.atan2(-q.y, q.x) * 180 / Math.PI) + 360) % 360) % 360;
+  const d = Math.max(0.5, Math.min(3, Math.round((Math.hypot(q.x, q.y) - 96) / 42 * 20) / 20));
+  if (drag === "man") { P.manAng = a; P.dist = d; } else if (drag === "woman") { P.womanAng = a; P.dist = d; } else { P.babyAng = a; P.babyDist = d; }
+  syncKnobs(); drawHead();
+});
+const endDrag = () => { if (drag) { drag = null; changed(); } };
+$("head").addEventListener("pointerup", endDrag);
+$("head").addEventListener("pointercancel", endDrag);
+
+// ---------------------------------------------------------------- rendering (worker)
+let worker = null, reqId = 0, latest = 0, busy = false, queued = false, timer = null, RES = null;
+const voiceBufs = {};
+for (const k in VOICES) { const b = atob(VOICES[k]), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); voiceBufs[k] = u.buffer; }
+try {
+  worker = new Worker(URL.createObjectURL(new Blob([$("engine").textContent], { type: "text/javascript" })));
+  worker.onmessage = e => onWorker(e.data);
+  worker.onerror = () => { worker = null; };
+} catch (_) { worker = null; }
+let sentVoices = false;
+function startRender() {
+  if (busy) { queued = true; return; }
+  busy = true; queued = false;
+  const id = ++reqId; latest = id;
+  setStatus(true, "Rendering the 8 microphones…");
+  const params = { ...P };
+  if (worker) {
+    const msg = { id, params };
+    if (!sentVoices) { msg.voiceBufs = { male: voiceBufs.male.slice(0), female: voiceBufs.female.slice(0), baby: voiceBufs.baby.slice(0) }; sentVoices = true; }
+    worker.postMessage(msg);
+  } else {
+    setTimeout(() => {
+      try {
+        const v = { male: readWav(voiceBufs.male, true).x, female: readWav(voiceBufs.female, true).x, baby: readWav(voiceBufs.baby, false).x };
+        onWorker({ id, res: render(params, v) });
+      } catch (err) { onWorker({ id, error: String(err) }); }
+    }, 30);
+  }
+}
+function onWorker(d) {
+  if (d.progress) { setStatus(true, d.progress + "…"); return; }
+  busy = false;
+  if (d.error) { setStatus(false, "Rendering failed: " + d.error.split("\n")[0]); return; }
+  if (queued) { startRender(); }
+  RES = d.res;
+  buffers = {};
+  srpPeaks = RES.srp.peaks;
+  drawHead(); buildLists(); buildScores(); drawTimeline();
+  setStatus(false, queued ? "Updating…" : `Rendered in ${(RES.ms / 1000).toFixed(1)} s.`);
+  if (!view || view.src !== "py") selectTrack(view ? view.key : "mic1", false);
+  const truth = [["man", P.manAng], ["woman", P.womanAng]].concat(P.babyOn ? [["baby", P.babyAng]] : []);
+  $("hears").innerHTML = `Robot hears sound from <b>${srpPeaks.map(a => a + "°").join(", ")}</b> · true: ${truth.map(([n, a]) => `${n} ${a}°`).join(", ")}`;
+}
+function setStatus(spin, text) { $("status").innerHTML = (spin ? '<span class="spinner" aria-hidden="true"></span>' : "") + `<span>${text}</span>`; }
+function changed(now) {
+  syncKnobs(); drawHead(); drawTimeline();
+  clearTimeout(timer);
+  timer = setTimeout(startRender, now ? 0 : 450);
+}
+
+// ---------------------------------------------------------------- audio
+// Single tracks play through an <audio> element (works with the phone's silent switch on);
+// the mic mix uses Web Audio. Both are unlocked on the first tap, inside the gesture.
+let ctx = null, buffers = {}, playing = null, stereo = false, player = null, unlocked = false;
+const PLAY = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z" fill="currentColor"/></svg>';
+const DL = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.5v7.5M3.5 6 7 9.5 10.5 6M2 12.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const STOP = '<svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="1" fill="currentColor"/></svg>';
+function audioCtx() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); return ctx; }
+function wavBlob(arr, rate = 16000) { return new Blob([wavBytes(arr, rate)], { type: "audio/wav" }); }
+function wavBytes(arr, rate = 16000) {
+  const n = arr.length, b = new ArrayBuffer(44 + 2 * n), v = new DataView(b);
+  const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+  w(0, "RIFF"); v.setUint32(4, 36 + 2 * n, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, 2 * n, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + 2 * i, Math.max(-1, Math.min(1, arr[i])) * 32767, true);
+  return new Uint8Array(b);
+}
+// ---- downloads: the Claude viewer saves .zip (not .wav), so audio goes inside a zip there
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u) { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = CRC[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function makeZip(files) {                       // files: [{name, data: Uint8Array}], stored (no compression)
+  const enc = new TextEncoder(), parts = [], central = [];
+  let off = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), crc = crc32(f.data), h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true);
+    h.setUint32(14, crc, true); h.setUint32(18, f.data.length, true); h.setUint32(22, f.data.length, true); h.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(h.buffer), name, f.data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true);
+    c.setUint32(16, crc, true); c.setUint32(20, f.data.length, true); c.setUint32(24, f.data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), name);
+    off += 30 + name.length + f.data.length;
+  }
+  const size = central.reduce((a, u) => a + u.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, size, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type: "application/zip" });
+}
+const downloadsP = window.claude && window.claude.use ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
+function plainDownload(name, blob) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+async function offerFiles(zipName, files) {
+  const dl = await downloadsP;
+  if (dl) {
+    try { await dl.save({ filename: zipName, data: makeZip(files) }); setStatus(false, `Saved ${zipName}.`); }
+    catch (e) { if (e && e.code !== "declined") setStatus(false, `Couldn't save the file: ${e.message || e.code}.`); }
+    return;
+  }
+  if (files.length === 1) plainDownload(files[0].name, new Blob([files[0].data], { type: files[0].name.endsWith(".wav") ? "audio/wav" : "text/plain" }));
+  else plainDownload(zipName, makeZip(files));
+}
+const SILENT = URL.createObjectURL(wavBlob(new Float32Array(1600)));
+function wavDataUri(arr) {
+  return new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(wavBlob(arr)); });
+}
+function unlock() {
+  if (unlocked) return;
+  unlocked = true;
+  try { const c = audioCtx(); c.resume(); const s = c.createBufferSource(); s.buffer = c.createBuffer(1, 1, c.sampleRate); s.connect(c.destination); s.start(); } catch (_) {}
+  try { player = new Audio(); player.preload = "auto"; player.src = SILENT; const p = player.play(); if (p) p.catch(() => {}); } catch (_) { player = null; }
+}
+for (const ev of ["pointerdown", "touchend", "keydown", "click"]) document.addEventListener(ev, unlock, { capture: true, passive: true });
+function toBuffer(arr) {
+  const c = audioCtx();
+  try { const b = c.createBuffer(1, arr.length, 16000); b.copyToChannel(arr, 0); return b; }
+  catch (_) {                                   // older Safari: no 16 kHz buffers, so upsample x3
+    const b = c.createBuffer(1, arr.length * 3, 48000), d = b.getChannelData(0);
+    for (let i = 0; i < arr.length; i++) { const a = arr[i], z = i + 1 < arr.length ? arr[i + 1] : a; d[3 * i] = a; d[3 * i + 1] = a + (z - a) / 3; d[3 * i + 2] = a + 2 * (z - a) / 3; }
+    return b;
+  }
+}
+function audioFail(err) {
+  stopAll();
+  setStatus(false, "The browser didn't start the sound" + (err && err.name ? ` (${err.name})` : "") + ". Tap Play again. On a phone, turn the volume up and check the silent switch.");
+}
+function stopAll() {
+  if (!playing) return;
+  (playing.sources || []).forEach(s => { try { s.stop(); } catch (_) {} });
+  if (playing.el) { playing.el.pause(); playing.el.onended = null; }
+  if (playing.url) URL.revokeObjectURL(playing.url);
+  if (playing.btn) playing.btn.innerHTML = PLAY;
+  playing = null;
+  $("vPlay").textContent = "Play"; $("playMics").textContent = "Play selected mics";
+  $("ph").style.opacity = 0; tlHead.setAttribute("opacity", 0);
+}
+function playArray(key, arr, btn, offset = 0) {
+  if (playing && playing.key === key && !offset) { stopAll(); return; }
+  stopAll(); unlock();
+  const dur = arr.length / 16000;
+  const mark = () => { if (btn) btn.innerHTML = STOP; $("vPlay").textContent = "Stop"; tick(); };
+  if (player) {
+    const url = URL.createObjectURL(wavBlob(arr));
+    const el = player;
+    playing = { key, el, url, dur, btn, viewKey: key };
+    el.onended = () => { if (playing && playing.el === el) stopAll(); };
+    el.src = url;
+    const go = () => { try { el.currentTime = offset; } catch (_) {} const p = el.play(); return p && p.then ? p : Promise.resolve(); };
+    // blob URL first; if the page blocks it, try an embedded data: URL, then Web Audio
+    go().then(mark).catch(err => {
+      if (!playing || playing.el !== el) return;
+      wavDataUri(arr).then(uri => { el.src = uri; return go(); }).then(mark)
+        .catch(err2 => { if (playing && playing.el === el) { playing.el = null; playWebAudio(key, arr, btn, offset, err2 || err); } });
+    });
+    return;
+  }
+  playWebAudio(key, arr, btn, offset);
+}
+function playWebAudio(key, arr, btn, offset, firstErr) {
+  try {
+    const c = audioCtx();
+    const s = c.createBufferSource(); s.buffer = toBuffer(arr); s.connect(c.destination);
+    const t = c.currentTime + 0.03; s.start(t, offset);
+    playing = { key, sources: [s], start: t - offset, dur: arr.length / 16000, btn, viewKey: key };
+    s.onended = () => { if (playing && playing.sources && playing.sources[0] === s) stopAll(); };
+    c.resume().then(() => { if (c.state !== "running") audioFail(firstErr); }).catch(audioFail);
+    if (btn) btn.innerHTML = STOP; $("vPlay").textContent = "Stop"; tick();
+  } catch (err) { audioFail(err); }
+}
+function playTime() {
+  if (!playing) return 0;
+  if (playing.el) return playing.el.currentTime || 0;
+  return Math.max(0, audioCtx().currentTime - playing.start);
+}
+const micPan = i => stereo ? -Math.sin(i * 2 * Math.PI / 8) * 0.9 : 0;
+function updateMicMix() {
+  if (!playing || playing.key !== "mics") return;
+  const n = Math.max(1, micOn.filter(Boolean).length), t = ctx.currentTime;
+  playing.gains.forEach((g, i) => g.gain.setTargetAtTime(micOn[i] ? (stereo ? 2 : 1) / n : 0, t, 0.02));
+  playing.pans.forEach((p, i) => p.pan.setTargetAtTime(micPan(i), t, 0.02));
+}
+$("playMics").addEventListener("click", () => {
+  if (!RES) return;
+  if (playing && playing.key === "mics") { stopAll(); return; }
+  stopAll(); unlock();
+  let c;
+  try { c = audioCtx(); } catch (err) { audioFail(err); return; }
+  c.resume().then(() => { if (c.state !== "running") audioFail(); }).catch(audioFail);
+  const sources = [], gains = [], pans = [], t = c.currentTime + 0.05;
+  for (let i = 0; i < 8; i++) {
+    const s = c.createBufferSource(); s.buffer = toBuffer(RES.mics[i]);
+    const g = c.createGain();
+    if (c.createStereoPanner) { const p = c.createStereoPanner(); s.connect(g).connect(p).connect(c.destination); pans.push(p); }
+    else s.connect(g).connect(c.destination);
+    sources.push(s); gains.push(g);
+  }
+  playing = { key: "mics", sources, gains, pans, start: t, dur: RES.mics[0].length / 16000 };
+  updateMicMix(); sources.forEach(s => s.start(t));
+  sources[0].onended = () => { if (playing && playing.key === "mics") stopAll(); };
+  $("playMics").textContent = "Stop";
+  showArray("mics", "Selected microphones", micDesc(), micSum(), "page");
+  tick();
+});
+function micSum() {
+  const on = micOn.map((v, i) => v ? i : -1).filter(i => i >= 0), out = new Float32Array(RES.mics[0].length);
+  for (const i of on) for (let t = 0; t < out.length; t++) out[t] += RES.mics[i][t] / on.length;
+  return out;
+}
+function micDesc() { const on = micOn.map((v, i) => v ? i + 1 : 0).filter(Boolean); return on.length === 8 ? "All 8 microphones summed." : on.length ? `Mics ${on.join(", ")} summed.` : "No microphones selected."; }
+$("allOn").addEventListener("click", () => { micOn.fill(true); drawHead(); updateMicMix(); });
+$("oneOn").addEventListener("click", () => { micOn = micOn.map((_, i) => i === 0); drawHead(); updateMicMix(); });
+$("stereo").addEventListener("click", e => { stereo = !stereo; e.currentTarget.setAttribute("aria-pressed", stereo); updateMicMix(); });
+
+function tick() {
+  if (!playing) return;
+  const t = Math.min(playing.dur, playTime());
+  const showHead = view && (playing.viewKey === view.key || (playing.key === "mics" && view.key === "mics"));
+  if (showHead) {
+    $("ph").style.opacity = 1;
+    const plots = $("plots"), cs = getComputedStyle(plots);
+    const l = parseFloat(cs.paddingLeft), r = parseFloat(cs.paddingRight), w = plots.clientWidth - l - r;
+    $("ph").style.left = (l + w * t / 5.5) + "px";
+    tlHead.setAttribute("x1", xs(t)); tlHead.setAttribute("x2", xs(t)); tlHead.setAttribute("opacity", 1);
+  }
+  $("vTime").textContent = `${t.toFixed(2)} / ${playing.dur.toFixed(2)} s`;
+  requestAnimationFrame(tick);
+}
+
+// ---------------------------------------------------------------- timeline
+const X0 = 120, X1 = 880, xs = t => X0 + (X1 - X0) * t / 5.5;
+let tlHead = el("line", {});
+function drawTimeline() {
+  const tl = $("tl"); tl.textContent = "";
+  const rows = [["Man", "man"], ["Woman", "woman"], ["Baby crying", "baby"], ["Fan speed", "fan"], ["Head turning", "neck"], ["Arm gesture", "sh"], ["Walking", "walk"]];
+  const active = { man: true, woman: true, baby: P.babyOn, fan: P.fanOn, neck: P.neckOn || P.clicksOn, sh: P.shouldersOn || P.clicksOn, walk: P.footstepsOn };
+  rows.forEach(([name, key], r) => {
+    const y = 10 + r * 30, h = 20, on = active[key];
+    el("text", { x: X0 - 12, y: y + 14, "text-anchor": "end", "font-size": 12.5, fill: on ? "var(--ink)" : "var(--soft)" }, tl, name);
+    el("rect", { x: X0, y, width: X1 - X0, height: h, rx: 4, fill: "var(--bg)" }, tl);
+    if (!on) return;
+    if (key === "man" || key === "woman") {
+      const [s, e] = RES ? RES.talk[key] : key === "man" ? [0.3, 2.2] : [2.6, 4.9];
+      el("rect", { x: xs(s), y, width: xs(e) - xs(s), height: h, rx: 4, fill: key === "man" ? "var(--a)" : "var(--b)" }, tl);
+    } else if (key === "baby") {
+      el("rect", { x: xs(0.1), y, width: xs(5.5) - xs(0.1), height: h, rx: 4, fill: "var(--baby)" }, tl);
+    } else if (RES) {
+      const vals = RES.motor[key].map(Math.abs), mx = key === "fan" ? Math.max(6000, ...vals) : Math.max(...vals) || 1;
+      let d = `M${xs(0)} ${y + h}`;
+      vals.forEach((v, i) => { d += ` L${xs(i / 100).toFixed(1)} ${(y + h - (h - 2) * v / mx).toFixed(1)}`; });
+      d += ` L${xs((vals.length - 1) / 100)} ${y + h} Z`;
+      el("path", { d, fill: "var(--noise)", "fill-opacity": 0.45, stroke: "var(--noise)", "stroke-width": 1 }, tl);
+    }
+  });
+  for (let s = 0; s <= 5; s++) el("text", { x: xs(s), y: 230, "text-anchor": "middle", "font-size": 11.5, fill: "var(--soft)" }, tl, s + " s");
+  tlHead = el("line", { x1: X0, x2: X0, y1: 6, y2: 216, stroke: "var(--ink)", "stroke-width": 2, opacity: 0 }, tl);
+}
+
+// ---------------------------------------------------------------- viewer
+let view = null;
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function hexRgb(h) {
+  const c = document.createElement("canvas").getContext("2d"); c.fillStyle = h; const s = c.fillStyle;
+  if (s.startsWith("#")) return [1, 3, 5].map(i => parseInt(s.slice(i, i + 2), 16));
+  return s.match(/\d+/g).slice(0, 3).map(Number);
+}
+function showArray(key, name, desc, arr, src) {
+  view = { key, name, desc, arr, src };
+  $("vName").textContent = name; $("vDesc").textContent = desc;
+  if (!playing) $("vTime").textContent = `0.00 / ${(arr.length / 16000).toFixed(2)} s`;
+  document.querySelectorAll("ol.tracks li").forEach(li => li.classList.toggle("sel", li.dataset.key === key));
+  drawWave(arr); drawSpec(arr);
+}
+function drawWave(arr) {
+  const c = $("wave"), dpr = window.devicePixelRatio || 1, W = Math.max(1, Math.round(c.clientWidth * dpr)), H = Math.round(84 * dpr);
+  c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  g.fillStyle = css("--spec0"); g.fillRect(0, 0, W, H);
+  g.fillStyle = css("--wave");
+  const per = arr.length / W;
+  let peak = 0; for (const v of arr) peak = Math.max(peak, Math.abs(v));
+  const sc = (H / 2 - 2) / Math.max(peak, 0.05);
+  for (let x = 0; x < W; x++) {
+    let lo = 0, hi = 0;
+    for (let i = Math.floor(x * per); i < Math.floor((x + 1) * per); i++) { const v = arr[i]; if (v < lo) lo = v; if (v > hi) hi = v; }
+    g.fillRect(x, H / 2 - hi * sc, 1, Math.max(1, (hi - lo) * sc));
+  }
+}
+function drawSpec(arr) {
+  const nfft = 512, hop = 128, nb = 257, nfr = Math.floor((arr.length - nfft) / hop) + 1;
+  const img = new Float32Array(nfr * nb);
+  const re = new Float64Array(nfft), im = new Float64Array(nfft);
+  let mx = -1e9;
+  for (let f = 0; f < nfr; f++) {
+    for (let i = 0; i < nfft; i++) { re[i] = arr[f * hop + i] * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / nfft)); im[i] = 0; }
+    fft(re, im, false);
+    for (let k = 0; k < nb; k++) { const v = 10 * Math.log10(re[k] * re[k] + im[k] * im[k] + 1e-12); img[f * nb + k] = v; if (v > mx) mx = v; }
+  }
+  const c = $("spec"); c.width = nfr; c.height = nb;
+  const g = c.getContext("2d"), data = g.createImageData(nfr, nb);
+  const c0 = hexRgb(css("--spec0")), c1 = hexRgb(css("--spec1")), c2 = hexRgb(css("--spec2"));
+  for (let f = 0; f < nfr; f++) for (let k = 0; k < nb; k++) {
+    const v = Math.max(0, Math.min(1, (img[f * nb + k] - (mx - 70)) / 70));
+    const [a, b, t] = v < 0.6 ? [c0, c1, v / 0.6] : [c1, c2, (v - 0.6) / 0.4];
+    const o = ((nb - 1 - k) * nfr + f) * 4;
+    data.data[o] = a[0] + (b[0] - a[0]) * t; data.data[o + 1] = a[1] + (b[1] - a[1]) * t; data.data[o + 2] = a[2] + (b[2] - a[2]) * t; data.data[o + 3] = 255;
+  }
+  g.putImageData(data, 0, 0);
+}
+$("vPlay").addEventListener("click", () => {
+  if (!view) return;
+  if (playing) { stopAll(); return; }
+  const btn = document.querySelector(`ol.tracks li[data-key="${view.key}"] .play`);
+  playArray(view.key, view.arr, btn);
+});
+$("plots").addEventListener("click", e => {
+  if (!view) return;
+  const plots = $("plots"), cs = getComputedStyle(plots), rect = plots.getBoundingClientRect();
+  const l = parseFloat(cs.paddingLeft), r = parseFloat(cs.paddingRight), w = rect.width - l - r;
+  const t = Math.max(0, Math.min(5.4, (e.clientX - rect.left - l) / w * 5.5));
+  stopAll();
+  const btn = document.querySelector(`ol.tracks li[data-key="${view.key}"] .play`);
+  playArray(view.key, view.arr, btn, t);
+});
+
+// ---------------------------------------------------------------- track lists
+function trackRow(list, o) {
+  const li = document.createElement("li"); li.dataset.key = o.key;
+  li.innerHTML = `<span class="badge" style="--c:${o.color || "var(--soft)"}">${o.badge || ""}</span><div class="tt"><b></b><span></span></div>`;
+  li.querySelector("b").textContent = o.label; li.querySelector(".tt span").textContent = o.desc || "";
+  if (o.score != null) {
+    const s = document.createElement("div"); s.className = "score";
+    s.innerHTML = `<b>${o.score >= 0 ? "+" : "−"}${Math.abs(o.score).toFixed(1)}</b> dB` + (o.py != null ? `<span class="py">Python ${o.py >= 0 ? "+" : "−"}${Math.abs(o.py).toFixed(1)}</span>` : "");
+    li.appendChild(s);
+  }
+  if (o.file) {
+    const d = document.createElement("button"); d.className = "dl"; d.innerHTML = DL; d.setAttribute("aria-label", "Download " + o.label); d.title = "Download";
+    d.addEventListener("click", e => { e.stopPropagation(); (o.bytes ? o.bytes() : o.get().then(a => a && wavBytes(a))).then(u => { if (u) offerFiles(o.file.replace(/\.wav$/, ".zip"), [{ name: o.file, data: u }]); }); });
+    li.appendChild(d);
+  }
+  const btn = document.createElement("button"); btn.className = "play"; btn.innerHTML = PLAY; btn.setAttribute("aria-label", "Play " + o.label);
+  li.appendChild(btn);
+  const name = o.viewName || o.label;
+  const show = () => o.get().then(arr => { if (arr) showArray(o.key, name, o.desc || "", arr, o.src); });
+  li.addEventListener("click", e => { if (e.target.closest(".play")) return; show(); });
+  btn.addEventListener("click", () => o.get().then(arr => { if (!arr) return; showArray(o.key, name, o.desc || "", arr, o.src); playArray(o.key, arr, btn); }));
+  list.appendChild(li);
+  return li;
+}
+function buildLists() {
+  const pr = PRESETS.find(x => x.id === presetId), py = presetMatches() && pr.py ? pr.py : {};
+  const S = RES.scores, bl = $("beamList"); bl.textContent = "";
+  const page = a => () => Promise.resolve(a);
+  trackRow(bl, { key: "mic1", file: "mic1_original.wav", label: "Mic 1 alone (the original)", desc: "Everything, as one microphone hears it.", score: S.mic_man, py: py.mic_man, badge: "1", color: "var(--mic)", get: page(RES.tracks.mic1), src: "page" });
+  for (const [who, c, badge] of [["man", "var(--a)", "M"], ["woman", "var(--b)", "W"]]) {
+    const items = [["das", "Delay-and-sum", "Lines up the 8 mics toward the " + who + "."], ["mvdr", "MVDR", "Also turns down sounds from other directions."], ["learned", "MVDR + learned robot noise", "Also heard the robot moving with nobody talking."]];
+    const sub = document.createElement("li"); sub.className = "subrow"; sub.innerHTML = `<h3 class="subhead" style="color:${c}">Aimed at the ${who}</h3>`; bl.appendChild(sub);
+    for (const [k, label, desc] of items) {
+      const id = `${who}_${k}`;
+      if (!RES.tracks[id]) continue;
+      trackRow(bl, { key: id, file: `${id}.wav`, label, viewName: `${label}, aimed at the ${who}`, desc, score: S[id], py: py[id], badge, color: c, get: page(RES.tracks[id]), src: "page" });
+    }
+  }
+  const sl = $("soloList"); sl.textContent = "";
+  const solos = [["man", "The man", "var(--a)", "M"], ["woman", "The woman", "var(--b)", "W"], ["baby", "The baby", "var(--baby)", "B"]]
+    .concat(NOISES.map(n => [n.k, { fan: "Fan", neck: "Neck servo", shoulders: "Shoulders", clicks: "Brakes", hum: "Hum", footsteps: "Footsteps" }[n.k], "var(--noise)", n.label[0]]));
+  for (const [k, label, c, b] of solos) if (RES.solos[k]) trackRow(sl, { key: "solo_" + k, file: `alone_${k}.wav`, label, desc: k === "footsteps" ? "Approximate." : "", badge: b, color: c, get: page(RES.solos[k]), src: "page" });
+  if (view) document.querySelectorAll("ol.tracks li").forEach(li => li.classList.toggle("sel", li.dataset.key === view.key));
+}
+const SCORE_ROWS = [["mic", "Mic 1 alone (the original)"], ["das", "Delay-and-sum"], ["mvdr", "MVDR beamformer"], ["learned", "MVDR, learned robot noise"]];
+function fmt(v) { return v == null ? "—" : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}`; }
+function scoreRows() {
+  const pr = PRESETS.find(x => x.id === presetId), py = presetMatches() && pr.py ? pr.py : {}, S = RES.scores, out = [];
+  for (const [k, label] of SCORE_ROWS) {
+    const get = who => k === "mic" ? S["mic_" + who] : S[`${who}_${k}`];
+    if (get("man") == null) continue;
+    const row = { label, k };
+    for (const who of ["man", "woman"]) {
+      row[who] = get(who); row[who + "Gain"] = k === "mic" ? null : get(who) - S["mic_" + who];
+      row[who + "Py"] = k === "mic" ? py["mic_" + who] : py[`${who}_${k}`];
+    }
+    out.push(row);
+  }
+  return { rows: out, hasPy: Object.keys(py).length > 0, pr };
+}
+function buildScores() {
+  const { rows, hasPy, pr } = scoreRows(), t = $("scoreTable");
+  t.innerHTML = `<colgroup><col class="c-proc"><col><col><col><col><col><col></colgroup>
+    <thead><tr><th></th><th colspan="3" class="who-a g">Aimed at the man</th><th colspan="3" class="who-b g">Aimed at the woman</th></tr>
+    <tr><th>Processing</th><th class="g">Score</th><th>Gain</th><th>Python</th><th class="g">Score</th><th>Gain</th><th>Python</th></tr></thead><tbody></tbody>`;
+  const tb = t.querySelector("tbody");
+  for (const r of rows) {
+    const tr = document.createElement("tr"); if (r.k === "mic") tr.className = "orig";
+    tr.innerHTML = `<td>${r.label}</td>` + ["man", "woman"].map(w =>
+      `<td class="g"><b>${fmt(r[w])} dB</b></td><td>${r[w + "Gain"] == null ? "" : fmt(r[w + "Gain"]) + " dB"}</td><td class="py">${r[w + "Py"] == null ? "—" : fmt(r[w + "Py"]) + " dB"}</td>`).join("");
+    tb.appendChild(tr);
+  }
+  $("scoreNote").textContent = hasPy
+    ? `Python column: the same scene from sim_conversation.py (pyroomacoustics). The page's numbers should land within about 0.5 dB.`
+    : `Python numbers exist only for the “Baby crying” and “Baby + fan” scenes with their default knobs. Pick one of those to compare.`;
+  $("dlAll").disabled = false;
+}
+function scoresCsv() {
+  const { rows } = scoreRows();
+  const lines = ["processing,man_score_db,man_gain_db,man_python_db,woman_score_db,woman_gain_db,woman_python_db"];
+  const f = v => v == null ? "" : v.toFixed(2);
+  for (const r of rows) lines.push([`"${r.label}"`, f(r.man), f(r.manGain), f(r.manPy), f(r.woman), f(r.womanGain), f(r.womanPy)].join(","));
+  return lines.join("\n") + "\n";
+}
+$("dlAll").addEventListener("click", () => {
+  if (!RES) return;
+  const enc = new TextEncoder(), files = [];
+  RES.mics.forEach((m, i) => files.push({ name: `mics/mic${i + 1}.wav`, data: wavBytes(m) }));
+  files.push({ name: "mic1_original.wav", data: wavBytes(RES.tracks.mic1) });
+  for (const k in RES.tracks) if (k !== "mic1") files.push({ name: `beams/${k}.wav`, data: wavBytes(RES.tracks[k]) });
+  for (const k in RES.solos) files.push({ name: `alone/${k}.wav`, data: wavBytes(RES.solos[k]) });
+  files.push({ name: "scores.csv", data: enc.encode(scoresCsv()) });
+  files.push({ name: "settings.json", data: enc.encode(JSON.stringify(P, null, 2) + "\n") });
+  offerFiles(`robot_acoustic_${presetMatches() ? presetId : "custom"}.zip`, files);
+});
+function selectTrack(key, play) {
+  const map = { ...RES.tracks }; for (const k in RES.solos) map["solo_" + k] = RES.solos[k];
+  if (key === "mics") { showArray("mics", "Selected microphones", micDesc(), micSum(), "page"); return; }
+  const li = document.querySelector(`ol.tracks li[data-key="${key}"]`);
+  const k = map[key] ? key : "mic1";
+  const label = li ? li.querySelector("b").textContent : "Mic 1 alone", desc = li ? li.querySelector(".tt span").textContent : "";
+  showArray(k, label, desc, map[k], "page");
+}
+
+// ---------------------------------------------------------------- Python recordings
+const pyCache = {};
+function fetchWav(path) {
+  if (pyCache[path]) return pyCache[path];
+  const tryUrl = u => fetch(u).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); });
+  pyCache[path] = tryUrl("audio/" + path).catch(() => tryUrl("../" + path))
+    .then(buf => Float32Array.from(readWav(buf).x))
+    .catch(() => { delete pyCache[path]; return null; });
+  return pyCache[path];
+}
+function fetchRaw(path) {
+  const tryUrl = u => fetch(u).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); });
+  return tryUrl("audio/" + path).catch(() => tryUrl("../" + path)).then(b => new Uint8Array(b)).catch(() => null);
+}
+function buildPyList() {
+  const root = $("pyList");
+  for (const grp of PY_FILES) {
+    const box = document.createElement("details"); box.className = "lgroup";
+    if (root.children.length < 2) box.open = true;
+    const h = document.createElement("summary"); h.innerHTML = `<h3></h3><small>${grp.files.length} files</small>`; h.querySelector("h3").textContent = grp.title; box.appendChild(h);
+    const ol = document.createElement("ol"); ol.className = "tracks"; box.appendChild(ol);
+    const err = document.createElement("p"); err.className = "err"; err.hidden = true;
+    err.textContent = "Couldn't load this file. The list works on the published page, or when the repo folder is served by a local web server (python -m http.server).";
+    for (const f of grp.files) {
+      trackRow(ol, { key: "py_" + f.path, file: f.path.split("/").pop(), bytes: () => fetchRaw(f.path), label: f.label, viewName: `Python · ${grp.title} · ${f.label}`, desc: f.path.split("/").pop(), badge: "py", color: "var(--soft)", src: "py",
+        get: () => fetchWav(f.path).then(a => { err.hidden = !!a; return a; }) });
+    }
+    box.appendChild(err);
+    root.appendChild(box);
+  }
+}
+
+// ---------------------------------------------------------------- sound check
+const beepArr = Float32Array.from({ length: 16000 }, (_, i) => 0.4 * Math.sin(2 * Math.PI * 660 * i / 16000) * Math.min(1, i / 400, (16000 - i) / 400));
+function beepLog(msg) { $("beepOut").textContent = msg + `\nAudio engine: ${ctx ? ctx.state + ", " + ctx.sampleRate + " Hz" : "not started"} · ${navigator.userAgent}`; }
+$("beep1").addEventListener("click", () => {
+  stopAll();
+  const a = new Audio(URL.createObjectURL(wavBlob(beepArr)));
+  a.onerror = () => beepLog("Beep 1: the audio player could not load the sound (error " + (a.error && a.error.code) + ").");
+  const p = a.play();
+  (p && p.then ? p : Promise.resolve()).then(() => beepLog("Beep 1: playing through the audio player.")).catch(e => beepLog("Beep 1 blocked: " + e.name + " " + e.message));
+});
+$("beep2").addEventListener("click", () => {
+  stopAll();
+  const a = new Audio();
+  wavDataUri(beepArr).then(uri => { a.src = uri; return a.play(); })
+    .then(() => beepLog("Beep 2: playing an embedded file.")).catch(e => beepLog("Beep 2 blocked: " + e.name + " " + e.message));
+});
+$("beep3").addEventListener("click", () => {
+  stopAll();
+  try {
+    const c = audioCtx();
+    const o = c.createOscillator(), g = c.createGain();
+    g.gain.value = 0.25; o.frequency.value = 660; o.connect(g).connect(c.destination);
+    o.start(); o.stop(c.currentTime + 1);
+    c.resume().then(() => beepLog("Beep 3: Web Audio is " + c.state + ".")).catch(e => beepLog("Beep 3 blocked: " + e.name + " " + e.message));
+  } catch (e) { beepLog("Beep 3 failed: " + e.name + " " + e.message); }
+});
+
+// ---------------------------------------------------------------- start
+buildKnobs(); syncKnobs(); drawHead(); drawTimeline(); buildPyList();
+startRender();
+let resizeT = null;
+window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (view) drawWave(view.arr); }, 150); });
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { if (view) { drawWave(view.arr); drawSpec(view.arr); } });
+</script>
