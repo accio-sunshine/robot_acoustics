@@ -35,7 +35,7 @@ robot-audio/
 ├── results/                  one folder per experiment (baseline outputs)
 ├── sim_noise_out/            robot-noise scenes + motor_state.csv
 ├── sim_conversation_out/     conversation scenes
-└── web/array_bench.html      interactive version with all scene knobs (open in a browser)
+└── web/                      robot_acoustic.html (robot's-eye listening lab) and array_bench.html
 ```
 
 ## Scripts
@@ -115,6 +115,24 @@ It uses a lighter room model (exact reflections up to 2 bounces, statistical lat
 spectra). Against every experiment scene, mic-1 and delay-and-sum scores land within about 0.5 dB of
 Python in most scenes, MVDR within about 1.5 dB, and SRP-PHAT within a few degrees. Use it to choose
 scenes, then confirm in Python.
+
+## Robot Acoustic page
+
+`web/robot_acoustic.html` is the conversation scene from the robot's point of view. The robot's head is in
+the middle with its 8 mics, the man, woman and baby can be dragged around it, and every robot noise (fan,
+neck servo, shoulder servos, brake clicks, 50 Hz hum, footsteps) has an on/off switch and a loudness knob,
+along with the baby, room echo, noise floor and mic ring size. Each change re-renders all 8 microphones in
+the browser. You can listen to any mics (stereo for headphones), to delay-and-sum, MVDR and learned-robot-noise
+beamformers aimed at each speaker, and to each sound alone, with a timeline, waveform and spectrogram.
+The Python recordings from `sim_conversation_out/` and `sim_noise_out/` can be played and viewed alongside.
+
+The page uses the same voices, noise recipes, levels and beamformers as the scripts. The room is lighter
+(exact reflections up to 3 bounces plus a statistical late echo). Beamformer scores land within about
+0.5 dB of Python in the baby and fan scenes. Footsteps are approximate and start switched off.
+
+Edit `web/src/engine.js` or `web/src/robot_acoustic.template.html`, then rebuild with
+`cd robot-audio/web && python build.py`. To use the Python recordings locally, serve the `robot-audio`
+folder (`python -m http.server`) and open `http://localhost:8000/web/robot_acoustic.html`.
 
 ## Typical workflow
 
