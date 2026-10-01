@@ -463,30 +463,84 @@ function changed(now) {
 }
 
 // ---------------------------------------------------------------- audio
-let ctx = null, buffers = {}, playing = null, stereo = false;
+// Single tracks play through an <audio> element (works with the phone's silent switch on);
+// the mic mix uses Web Audio. Both are unlocked on the first tap, inside the gesture.
+let ctx = null, buffers = {}, playing = null, stereo = false, player = null, unlocked = false;
 const PLAY = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z" fill="currentColor"/></svg>';
 const STOP = '<svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="1" fill="currentColor"/></svg>';
 function audioCtx() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); return ctx; }
-function toBuffer(arr) { const c = audioCtx(), b = c.createBuffer(1, arr.length, 16000); b.copyToChannel(arr, 0); return b; }
+function wavBlob(arr, rate = 16000) {
+  const n = arr.length, b = new ArrayBuffer(44 + 2 * n), v = new DataView(b);
+  const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+  w(0, "RIFF"); v.setUint32(4, 36 + 2 * n, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, 2 * n, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + 2 * i, Math.max(-1, Math.min(1, arr[i])) * 32767, true);
+  return new Blob([b], { type: "audio/wav" });
+}
+const SILENT = URL.createObjectURL(wavBlob(new Float32Array(1600)));
+function unlock() {
+  if (unlocked) return;
+  unlocked = true;
+  try { const c = audioCtx(); c.resume(); const s = c.createBufferSource(); s.buffer = c.createBuffer(1, 1, c.sampleRate); s.connect(c.destination); s.start(); } catch (_) {}
+  try { player = new Audio(); player.preload = "auto"; player.src = SILENT; const p = player.play(); if (p) p.catch(() => {}); } catch (_) { player = null; }
+}
+for (const ev of ["pointerdown", "touchend", "keydown", "click"]) document.addEventListener(ev, unlock, { capture: true, passive: true });
+function toBuffer(arr) {
+  const c = audioCtx();
+  try { const b = c.createBuffer(1, arr.length, 16000); b.copyToChannel(arr, 0); return b; }
+  catch (_) {                                   // older Safari: no 16 kHz buffers, so upsample x3
+    const b = c.createBuffer(1, arr.length * 3, 48000), d = b.getChannelData(0);
+    for (let i = 0; i < arr.length; i++) { const a = arr[i], z = i + 1 < arr.length ? arr[i + 1] : a; d[3 * i] = a; d[3 * i + 1] = a + (z - a) / 3; d[3 * i + 2] = a + 2 * (z - a) / 3; }
+    return b;
+  }
+}
+function audioFail(err) {
+  stopAll();
+  setStatus(false, "The browser didn't start the sound" + (err && err.name ? ` (${err.name})` : "") + ". Tap Play again. On a phone, turn the volume up and check the silent switch.");
+}
 function stopAll() {
   if (!playing) return;
-  playing.sources.forEach(s => { try { s.stop(); } catch (_) {} });
+  (playing.sources || []).forEach(s => { try { s.stop(); } catch (_) {} });
+  if (playing.el) { playing.el.pause(); playing.el.onended = null; }
+  if (playing.url) URL.revokeObjectURL(playing.url);
   if (playing.btn) playing.btn.innerHTML = PLAY;
   playing = null;
   $("vPlay").textContent = "Play"; $("playMics").textContent = "Play selected mics";
   $("ph").style.opacity = 0; tlHead.setAttribute("opacity", 0);
 }
-async function playArray(key, arr, btn, offset = 0) {
+function playArray(key, arr, btn, offset = 0) {
   if (playing && playing.key === key && !offset) { stopAll(); return; }
-  stopAll();
-  const c = audioCtx(); await c.resume();
-  const s = c.createBufferSource(); s.buffer = toBuffer(arr); s.connect(c.destination);
-  const t = c.currentTime + 0.03; s.start(t, offset);
-  playing = { key, sources: [s], start: t - offset, dur: arr.length / 16000, btn, viewKey: key };
-  if (btn) btn.innerHTML = STOP;
-  $("vPlay").textContent = "Stop";
-  s.onended = () => { if (playing && playing.sources[0] === s) stopAll(); };
-  tick();
+  stopAll(); unlock();
+  const dur = arr.length / 16000;
+  const mark = () => { if (btn) btn.innerHTML = STOP; $("vPlay").textContent = "Stop"; tick(); };
+  if (player) {
+    const url = URL.createObjectURL(wavBlob(arr));
+    const el = player;
+    playing = { key, el, url, dur, btn, viewKey: key };
+    el.onended = () => { if (playing && playing.el === el) stopAll(); };
+    el.src = url;
+    const go = () => { try { el.currentTime = offset; } catch (_) {} const p = el.play(); return p && p.then ? p : Promise.resolve(); };
+    go().then(mark).catch(err => { if (playing && playing.el === el) { playing.el = null; playWebAudio(key, arr, btn, offset, err); } });
+    return;
+  }
+  playWebAudio(key, arr, btn, offset);
+}
+function playWebAudio(key, arr, btn, offset, firstErr) {
+  try {
+    const c = audioCtx();
+    const s = c.createBufferSource(); s.buffer = toBuffer(arr); s.connect(c.destination);
+    const t = c.currentTime + 0.03; s.start(t, offset);
+    playing = { key, sources: [s], start: t - offset, dur: arr.length / 16000, btn, viewKey: key };
+    s.onended = () => { if (playing && playing.sources && playing.sources[0] === s) stopAll(); };
+    c.resume().then(() => { if (c.state !== "running") audioFail(firstErr); }).catch(audioFail);
+    if (btn) btn.innerHTML = STOP; $("vPlay").textContent = "Stop"; tick();
+  } catch (err) { audioFail(err); }
+}
+function playTime() {
+  if (!playing) return 0;
+  if (playing.el) return playing.el.currentTime || 0;
+  return Math.max(0, audioCtx().currentTime - playing.start);
 }
 const micPan = i => stereo ? -Math.sin(i * 2 * Math.PI / 8) * 0.9 : 0;
 function updateMicMix() {
@@ -495,16 +549,20 @@ function updateMicMix() {
   playing.gains.forEach((g, i) => g.gain.setTargetAtTime(micOn[i] ? (stereo ? 2 : 1) / n : 0, t, 0.02));
   playing.pans.forEach((p, i) => p.pan.setTargetAtTime(micPan(i), t, 0.02));
 }
-$("playMics").addEventListener("click", async () => {
+$("playMics").addEventListener("click", () => {
   if (!RES) return;
   if (playing && playing.key === "mics") { stopAll(); return; }
-  stopAll();
-  const c = audioCtx(); await c.resume();
+  stopAll(); unlock();
+  let c;
+  try { c = audioCtx(); } catch (err) { audioFail(err); return; }
+  c.resume().then(() => { if (c.state !== "running") audioFail(); }).catch(audioFail);
   const sources = [], gains = [], pans = [], t = c.currentTime + 0.05;
   for (let i = 0; i < 8; i++) {
     const s = c.createBufferSource(); s.buffer = toBuffer(RES.mics[i]);
-    const g = c.createGain(), p = c.createStereoPanner();
-    s.connect(g).connect(p).connect(c.destination); sources.push(s); gains.push(g); pans.push(p);
+    const g = c.createGain();
+    if (c.createStereoPanner) { const p = c.createStereoPanner(); s.connect(g).connect(p).connect(c.destination); pans.push(p); }
+    else s.connect(g).connect(c.destination);
+    sources.push(s); gains.push(g);
   }
   playing = { key: "mics", sources, gains, pans, start: t, dur: RES.mics[0].length / 16000 };
   updateMicMix(); sources.forEach(s => s.start(t));
@@ -525,7 +583,7 @@ $("stereo").addEventListener("click", e => { stereo = !stereo; e.currentTarget.s
 
 function tick() {
   if (!playing) return;
-  const t = Math.min(playing.dur, Math.max(0, audioCtx().currentTime - playing.start));
+  const t = Math.min(playing.dur, playTime());
   const showHead = view && (playing.viewKey === view.key || (playing.key === "mics" && view.key === "mics"));
   if (showHead) {
     $("ph").style.opacity = 1;
