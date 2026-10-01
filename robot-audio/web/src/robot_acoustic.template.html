@@ -37,20 +37,27 @@
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
 main { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; display: grid; gap: 20px; }
 h1 { font-size: 2rem; line-height: 1.15; margin: 0; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
-.lead { color: var(--soft); max-width: 70ch; margin: 6px 0 0; }
+.lead { color: var(--soft); margin: 0; font-size: 1.02rem; }
 h2 { font-size: 1.1rem; margin: 0; font-weight: 600; }
 h3 { font-size: .8rem; margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--soft); }
-.hint { color: var(--soft); font-size: .88rem; margin: 0; max-width: 62ch; }
+.hint { color: var(--soft); font-size: .88rem; margin: 0; }
 section { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 12px; min-width: 0; align-content: start; }
-.top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.top { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 20px; align-items: stretch; }
 @media (max-width: 880px) { .top { grid-template-columns: minmax(0, 1fr); } }
-.intro { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 24px; }
-@media (max-width: 880px) { .intro { grid-template-columns: minmax(0, 1fr); } }
-.intro p { margin: 6px 0 0; max-width: 62ch; color: var(--soft); }
-.purpose p:first-of-type { color: var(--ink); }
-.steps { margin: 8px 0 0; padding-left: 22px; display: grid; gap: 7px; color: var(--soft); max-width: 70ch; }
-.steps b { color: var(--ink); font-weight: 600; }
-.steps li::marker { color: var(--mic); font-weight: 700; }
+.intro { gap: 14px; }
+.intro-top { display: grid; gap: 8px; }
+.intro-top p:last-child { margin: 0; }
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: st; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 880px) { .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .steps { grid-template-columns: minmax(0, 1fr); } }
+.steps li { counter-increment: st; background: var(--bg); border-radius: 10px; padding: 12px 14px 12px 48px; position: relative; display: grid; gap: 2px; align-content: start; }
+.steps li::before { content: counter(st); position: absolute; left: 14px; top: 12px; width: 24px; height: 24px; border-radius: 50%; background: var(--mic); color: #fff; font-weight: 700; font-size: .8rem; display: grid; place-items: center; }
+.steps b { font-weight: 600; }
+.steps span { color: var(--soft); font-size: .88rem; }
+.about { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 880px) { .about { grid-template-columns: minmax(0, 1fr); } }
+.about > div { display: grid; gap: 4px; align-content: start; }
+.about p { margin: 0; color: var(--soft); font-size: .88rem; }
 .lists { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 880px) { .lists { grid-template-columns: minmax(0, 1fr); } }
 
@@ -80,8 +87,12 @@ button:disabled { opacity: .5; cursor: default; }
 
 /* knobs */
 .knobs { display: grid; gap: 16px; }
+@media (min-width: 1080px) { .knobs { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 24px; align-items: start; }
+  .kcol { display: grid; gap: 16px; align-content: start; } }
+.kcol { display: grid; gap: 16px; align-content: start; }
 .kgroup { display: grid; gap: 10px; }
 .kgroup + .kgroup { border-top: 1px solid var(--line); padding-top: 14px; }
+.kgroup .hint { margin-top: -4px; }
 .knob { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 10px; align-items: baseline; }
 .knob label { font-weight: 500; font-size: .92rem; }
 .knob output { font-family: var(--mono); font-size: .8rem; font-variant-numeric: tabular-nums; }
@@ -89,7 +100,7 @@ button:disabled { opacity: .5; cursor: default; }
 .noise { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0 10px; align-items: center; }
 .noise input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--noise); margin: 0; }
 .noise label { font-weight: 500; font-size: .92rem; }
-.noise label small { color: var(--soft); font-weight: 400; }
+.noise label small { color: var(--soft); font-weight: 400; white-space: nowrap; }
 .noise output { font-family: var(--mono); font-size: .8rem; font-variant-numeric: tabular-nums; }
 .noise input[type=range] { grid-column: 2 / -1; width: 100%; accent-color: var(--noise); margin: 0; }
 .noise.off label, .noise.off output { color: var(--soft); }
@@ -123,27 +134,43 @@ button:disabled { opacity: .5; cursor: default; }
 /* track lists */
 ol.tracks { list-style: none; margin: 0; padding: 0; }
 ol.tracks li { display: flex; gap: 12px; align-items: center; padding: 10px 6px; border-top: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
-ol.tracks li:first-child { border-top: 0; }
+ol.tracks li:first-child, ol.tracks li.subrow, ol.tracks li.subrow + li { border-top: 0; }
+ol.tracks li.subrow { cursor: default; padding: 8px 6px 0; }
+ol.tracks li.subrow:hover { background: none; }
+ol.tracks.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
+ol.tracks.grid2 li:nth-child(2) { border-top: 0; }
+ol.tracks.grid2 li { padding-block: 8px; }
+@media (max-width: 560px) { ol.tracks.grid2 { grid-template-columns: minmax(0, 1fr); } ol.tracks.grid2 li:nth-child(2) { border-top: 1px solid var(--line); } }
 ol.tracks li:hover { background: var(--bg); }
 ol.tracks li.sel { background: var(--bg); box-shadow: inset 3px 0 0 var(--mic); }
 .badge { flex: 0 0 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: .8rem; color: #fff; background: var(--c, var(--soft)); }
 .tt { flex: 1; min-width: 0; }
 .tt b { display: block; font-weight: 600; font-size: .95rem; }
 .tt span { color: var(--soft); font-size: .84rem; overflow-wrap: anywhere; }
-.score { flex: 0 0 auto; text-align: right; font-size: .82rem; color: var(--soft); font-variant-numeric: tabular-nums; line-height: 1.3; }
+.score { flex: 0 0 72px; text-align: right; font-size: .82rem; color: var(--soft); font-variant-numeric: tabular-nums; line-height: 1.3; }
 .score b { color: var(--ink); font-weight: 600; font-size: .95rem; }
 .score .py { display: block; font-family: var(--mono); font-size: .74rem; }
 .play { flex: 0 0 auto; width: 38px; height: 38px; padding: 0; display: grid; place-items: center; }
 .play svg { width: 13px; height: 13px; }
 .lgroup { display: grid; gap: 6px; }
-.lgroup + .lgroup { margin-top: 10px; }
+.lgroup + .lgroup { margin-top: 2px; }
+details.lgroup { border-top: 1px solid var(--line); padding-top: 10px; }
+details.lgroup summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+details.lgroup summary::-webkit-details-marker { display: none; }
+details.lgroup summary::after { content: "+"; font-weight: 600; color: var(--soft); font-size: 1.1rem; line-height: 1; }
+details.lgroup[open] summary::after { content: "−"; }
+details.lgroup summary small { white-space: nowrap; margin-left: auto; color: var(--soft); font-size: .78rem; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.subhead { margin: 10px 0 2px; }
 .err { color: var(--bad); font-size: .84rem; margin: 0; }
 .tablewrap { overflow-x: auto; }
 #scoreTable { border-collapse: collapse; width: 100%; min-width: 560px; font-variant-numeric: tabular-nums; font-size: .9rem; }
 #scoreTable th, #scoreTable td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
 #scoreTable th:first-child, #scoreTable td:first-child { text-align: left; white-space: normal; }
 #scoreTable thead th { font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--soft); font-weight: 600; }
-#scoreTable thead tr:first-child th { border-bottom: 0; padding-bottom: 0; }
+#scoreTable thead tr:first-child th { border-bottom: 2px solid currentColor; padding-bottom: 6px; text-align: center; }
+#scoreTable thead tr:first-child th:first-child { border-bottom: 0; }
+#scoreTable col.c-proc { width: 28%; }
+#scoreTable .g { border-left: 1px solid var(--line); }
 #scoreTable .who-a { color: var(--a); } #scoreTable .who-b { color: var(--b); }
 #scoreTable td.py { color: var(--soft); font-family: var(--mono); font-size: .82rem; }
 #scoreTable tr.orig td { background: var(--bg); }
@@ -154,35 +181,26 @@ ol.tracks li.sel { background: var(--bg); box-shadow: inset 3px 0 0 var(--mic); 
 .check-box summary { cursor: pointer; font-weight: 600; font-size: .92rem; }
 .check-box[open] { gap: 10px; }
 #beepOut { font-family: var(--mono); font-size: .78rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-footer { color: var(--soft); font-size: .86rem; max-width: 78ch; display: grid; gap: 8px; }
-footer p { margin: 0; }
 code { font-family: var(--mono); font-size: .82em; }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 </style>
 
 <main>
-  <header>
-    <h1>Robot Acoustic</h1>
-    <p class="lead">The world as a robot with 8 microphones on its head hears it. A man says “Hi there, how are you doing today?”, a woman answers “I'm good. What is the plan for the day?”, and a baby cries, while the robot's own fan, servos and electronics add noise right next to its microphones.</p>
-  </header>
-
-  <section class="intro" aria-labelledby="h-intro">
-    <div class="purpose">
-      <h2 id="h-intro">What this page is for</h2>
-      <p>To hear and measure how well the robot can pick out one person's voice when other people, a baby and its own body are making noise. It simulates the robot's 8 microphones for whatever scene you set up, then runs the same processing as the Python scripts. That means direction finding (where is each sound?) and beamforming, which combines the 8 microphones to focus on one speaker.</p>
-      <p>Use it to try ideas quickly, such as a louder fan, a person standing closer or a more echoey room, by ear and by score, before running the full Python simulation.</p>
+  <section class="intro" aria-labelledby="h-title">
+    <div class="intro-top">
+      <h1 id="h-title">Robot Acoustic</h1>
+      <p class="lead">The world as a robot with 8 microphones on its head hears it. A man says “Hi there, how are you doing today?”, a woman answers “I'm good. What is the plan for the day?”, and a baby cries, while the robot's own fan, servos and electronics add noise right next to its microphones.</p>
+      <p><b>What this page is for:</b> to hear and measure how well the robot can pick out one person's voice when other people, a baby and its own body are making noise. It simulates the robot's 8 microphones for the scene you set up, then runs the same processing as the Python scripts: direction finding (where each sound comes from) and beamforming (combining the 8 microphones to focus on one speaker). Use it to try ideas quickly, such as a louder fan, a closer speaker or a more echoey room, before running the full Python simulation.</p>
     </div>
-    <div>
-      <h2>How to use it</h2>
-      <ol class="steps">
-        <li><b>Pick a scene.</b> Under Knobs, start with Baby crying, Baby + fan, Robot moving or Quiet room.</li>
-        <li><b>Change the sounds.</b> Switch robot noises on or off and set their loudness, move the baby, and change the room echo. You can also drag the man (M), woman (W) and baby (B) around the robot's head. The page re-renders the 8 microphones in a few seconds.</li>
-        <li><b>Listen to the raw microphones.</b> Press Play selected mics. Click microphones on the head to choose which ones you hear, and use Stereo with headphones to hear left and right.</li>
-        <li><b>Compare the processing.</b> Under Pick out each speaker, play Mic 1 alone, then the beamformers aimed at the man or the woman. The dB score is the target voice against everything else, so higher means cleaner.</li>
-        <li><b>Look at the sound.</b> Clicking any row shows its waveform and spectrogram under the timeline. Click the picture to play from that moment.</li>
-        <li><b>Read the scores.</b> The Scores table shows each method against the original (mic 1 alone), and the Python numbers for the Baby crying and Baby + fan scenes. Download any sound with ↓, or everything with Download all.</li>
-      </ol>
-    </div>
+    <h2>How to use it</h2>
+    <ol class="steps">
+      <li><b>Pick a scene</b><span>Under Knobs, start with Baby crying, Baby + fan, Robot moving or Quiet room.</span></li>
+      <li><b>Change the sounds</b><span>Switch robot noises on or off, set their loudness, move the baby or change the echo. Drag M, W and B around the head. The mics re-render in a few seconds.</span></li>
+      <li><b>Listen to the raw mics</b><span>Press Play selected mics. Click mics on the head to choose which you hear. Use Stereo with headphones.</span></li>
+      <li><b>Compare the processing</b><span>Under Pick out each speaker, play Mic 1 alone, then the beamformers aimed at the man or the woman.</span></li>
+      <li><b>Look at the sound</b><span>Click any row to see its waveform and spectrogram. Click the picture to play from that moment.</span></li>
+      <li><b>Read the scores</b><span>The Scores table compares each method with the original (mic 1 alone) and with Python. Download any sound with ↓.</span></li>
+    </ol>
   </section>
 
   <div class="top">
@@ -256,11 +274,11 @@ code { font-family: var(--mono); font-size: .82em; }
   <div class="lists">
     <section aria-labelledby="h-pick">
       <h2 id="h-pick">Pick out each speaker</h2>
-      <p class="hint">dB = the target voice against everything else (higher is cleaner). Learned = the beamformer also hears a recording of the robot moving with nobody talking.</p>
+      <p class="hint">Higher dB means a cleaner target voice. The Scores table above explains the numbers.</p>
       <ol class="tracks" id="beamList"></ol>
       <h3 style="margin-top: 8px">Each sound alone, at mic 1</h3>
       <p class="hint">Normalised so you can hear its character.</p>
-      <ol class="tracks" id="soloList"></ol>
+      <ol class="tracks grid2" id="soloList"></ol>
     </section>
     <section aria-labelledby="h-py">
       <h2 id="h-py">Python recordings</h2>
@@ -269,11 +287,11 @@ code { font-family: var(--mono); font-size: .82em; }
     </section>
   </div>
 
-  <footer>
-    <p><b>How the page makes the sound.</b> Same room (6 × 5 × 3 m), same 8-mic ring, voices, robot noise recipes, levels and beamformers as the Python scripts. The room is lighter: exact wall reflections up to 3 bounces plus a statistical late echo. With the default settings the beamformer scores land within about 0.5 dB of Python in the baby and fan scenes.</p>
-    <p><b>Footsteps are approximate.</b> The page's beamformer cancels the footstep thump much less than Python does, so footsteps start switched off. Switch them on to hear them, but don't read too much into the scores.</p>
-    <p>Levels are loudness at mic 1 compared with the man's voice, as in the scripts' <code>LEVEL_DB</code> and <code>BABY_DB</code>.</p>
-  </footer>
+  <section class="about" aria-label="About the simulation">
+    <div><h3>How the page makes the sound</h3><p>Same room (6 × 5 × 3 m), 8-mic ring, voices, robot noise recipes, levels and beamformers as the Python scripts. The room is lighter: exact wall reflections up to 3 bounces plus a statistical late echo. Scores land within about 0.5 dB of Python in the baby and fan scenes.</p></div>
+    <div><h3>Footsteps are approximate</h3><p>The page's beamformer cancels the footstep thump much less than Python does, so footsteps start switched off. Switch them on to hear them, but don't read too much into the scores.</p></div>
+    <div><h3>Loudness levels</h3><p>Every level is loudness at mic 1 compared with the man's voice, as in the scripts' <code>LEVEL_DB</code> and <code>BABY_DB</code>.</p></div>
+  </section>
 </main>
 
 <script id="engine">
@@ -302,26 +320,26 @@ const PRESETS = [
 let P = { ...DEF }, presetId = "robot";
 const deg = v => `${Math.round(v)}°`, m = v => `${v.toFixed(2)} m`, dB = v => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(0)} dB`;
 const NOISES = [
-  { k: "fan", label: "Cooling fan", where: "back of the head", c: [-46, 0] },
-  { k: "neck", label: "Neck servo", where: "below the mics", c: [0, -20] },
+  { k: "fan", label: "Cooling fan", where: "back of head", c: [-46, 0] },
+  { k: "neck", label: "Neck servo", where: "under the mics", c: [0, -20] },
   { k: "shoulders", label: "Shoulder servos", where: "left shoulder", c: [0, -122], outside: true },
-  { k: "clicks", label: "Brake clicks", where: "joints start and stop", c: [0, 20] },
-  { k: "hum", label: "Electrical hum", where: "50 Hz on every channel", c: [40, -34] },
+  { k: "clicks", label: "Brake clicks", where: "joints", c: [0, 20] },
+  { k: "hum", label: "Electrical hum", where: "50 Hz", c: [40, -34] },
   { k: "footsteps", label: "Footsteps", where: "approximate", c: [40, 34] },
 ];
 const KNOBS = [
-  { title: "People", items: [
+  { title: "People", col: 0, items: [
     { k: "manAng", label: "Man direction", min: 0, max: 359, step: 1, fmt: deg },
     { k: "womanAng", label: "Woman direction", min: 0, max: 359, step: 1, fmt: deg },
     { k: "dist", label: "Their distance from the robot", min: 0.5, max: 3, step: 0.05, fmt: m }] },
-  { title: "Baby", toggle: "babyOn", items: [
+  { title: "Baby", col: 0, toggle: "babyOn", items: [
     { k: "babyDb", label: "Loudness", min: -24, max: 6, step: 1, fmt: dB },
     { k: "babyAng", label: "Direction", min: 0, max: 359, step: 1, fmt: deg },
     { k: "babyDist", label: "Distance", min: 0.5, max: 3, step: 0.05, fmt: m }] },
-  { title: "Robot noise", noises: true },
-  { title: "Room and array", items: [
+  { title: "Robot noise", col: 1, noises: true },
+  { title: "Room and array", col: 1, items: [
     { k: "rt60", label: "Echo time RT60", min: 0.2, max: 1.0, step: 0.05, fmt: v => v.toFixed(2) + " s" },
-    { k: "roomDb", label: "Room noise floor", min: 5, max: 40, step: 1, fmt: v => v + " dB below the man" },
+    { k: "roomDb", label: "Room noise floor (vs man)", min: 5, max: 40, step: 1, fmt: v => `−${v} dB` },
     { k: "radius", label: "Mic ring radius", min: 3, max: 10, step: 0.5, fmt: v => v.toFixed(1) + " cm" }] },
 ];
 
@@ -337,7 +355,8 @@ function knobEl(def, parent) {
   inputs[def.k] = { inp, out: d.querySelector("output"), fmt: def.fmt };
 }
 function buildKnobs() {
-  const root = $("knobs");
+  const root = $("knobs"), cols = [document.createElement("div"), document.createElement("div")];
+  cols.forEach(c => { c.className = "kcol"; root.appendChild(c); });
   for (const g of KNOBS) {
     const box = document.createElement("div"); box.className = "kgroup";
     const h = document.createElement("h3"); h.textContent = g.title; box.appendChild(h);
@@ -364,7 +383,7 @@ function buildKnobs() {
       }
     }
     for (const it of g.items || []) knobEl(it, box);
-    root.appendChild(box);
+    cols[g.col].appendChild(box);
   }
   for (const pr of PRESETS) {
     const b = document.createElement("button"); b.textContent = pr.label; b.dataset.id = pr.id;
@@ -406,7 +425,7 @@ function drawHead() {
     el("circle", { cx: 0, cy: 0, r: R(d), fill: "none", stroke: "var(--line)", "stroke-dasharray": "3 6" }, svg);
     { const [lx, ly] = pt(-62, R(d) + 6); el("text", { x: lx, y: ly + 4, "font-size": 11, fill: "var(--soft)" }, svg, d + " m"); }
   }
-  for (const a of [0, 90, 180, 270]) { const [x, y] = pt(a, 232); el("text", { x, y: y + 4, "text-anchor": "middle", "font-size": 11, fill: "var(--soft)" }, svg, a + "°"); }
+  for (const [a, anchor] of [[0, "end"], [90, "middle"], [180, "start"], [270, "middle"]]) { const [x, y] = pt(a, 234); el("text", { x, y: y + (a === 90 ? 10 : a === 270 ? 0 : -10), "text-anchor": anchor, "font-size": 11, fill: "var(--soft)" }, svg, a + "°"); }
   // SRP estimates
   for (const a of srpPeaks) {
     const [x1, y1] = pt(a, 80), [x2, y2] = pt(a, 222);
@@ -828,18 +847,19 @@ function buildLists() {
   const pr = PRESETS.find(x => x.id === presetId), py = presetMatches() && pr.py ? pr.py : {};
   const S = RES.scores, bl = $("beamList"); bl.textContent = "";
   const page = a => () => Promise.resolve(a);
-  trackRow(bl, { key: "mic1", file: "mic1_original.wav", label: "Mic 1 alone", desc: "Everything, as one microphone hears it. Score for the man.", score: S.mic_man, py: py.mic_man, badge: "1", color: "var(--mic)", get: page(RES.tracks.mic1), src: "page" });
+  trackRow(bl, { key: "mic1", file: "mic1_original.wav", label: "Mic 1 alone (the original)", desc: "Everything, as one microphone hears it.", score: S.mic_man, py: py.mic_man, badge: "1", color: "var(--mic)", get: page(RES.tracks.mic1), src: "page" });
   for (const [who, c, badge] of [["man", "var(--a)", "M"], ["woman", "var(--b)", "W"]]) {
-    const items = [["das", "Delay-and-sum", "Lines up the 8 mics toward the " + who + "."], ["mvdr", "MVDR beamformer", "Also turns down sounds from other directions."], ["learned", "MVDR, learned robot noise", "Also learned from the robot moving with nobody talking."]];
+    const items = [["das", "Delay-and-sum", "Lines up the 8 mics toward the " + who + "."], ["mvdr", "MVDR", "Also turns down sounds from other directions."], ["learned", "MVDR + learned robot noise", "Also heard the robot moving with nobody talking."]];
+    const sub = document.createElement("li"); sub.className = "subrow"; sub.innerHTML = `<h3 class="subhead" style="color:${c}">Aimed at the ${who}</h3>`; bl.appendChild(sub);
     for (const [k, label, desc] of items) {
       const id = `${who}_${k}`;
       if (!RES.tracks[id]) continue;
-      trackRow(bl, { key: id, file: `${id}.wav`, label: `${label} at the ${who}`, desc, score: S[id], py: py[id], badge, color: c, get: page(RES.tracks[id]), src: "page" });
+      trackRow(bl, { key: id, file: `${id}.wav`, label, viewName: `${label}, aimed at the ${who}`, desc, score: S[id], py: py[id], badge, color: c, get: page(RES.tracks[id]), src: "page" });
     }
   }
   const sl = $("soloList"); sl.textContent = "";
   const solos = [["man", "The man", "var(--a)", "M"], ["woman", "The woman", "var(--b)", "W"], ["baby", "The baby", "var(--baby)", "B"]]
-    .concat(NOISES.map(n => [n.k, n.label, "var(--noise)", ""]));
+    .concat(NOISES.map(n => [n.k, { fan: "Fan", neck: "Neck servo", shoulders: "Shoulders", clicks: "Brakes", hum: "Hum", footsteps: "Footsteps" }[n.k], "var(--noise)", n.label[0]]));
   for (const [k, label, c, b] of solos) if (RES.solos[k]) trackRow(sl, { key: "solo_" + k, file: `alone_${k}.wav`, label, desc: k === "footsteps" ? "Approximate." : "", badge: b, color: c, get: page(RES.solos[k]), src: "page" });
   if (view) document.querySelectorAll("ol.tracks li").forEach(li => li.classList.toggle("sel", li.dataset.key === view.key));
 }
@@ -861,13 +881,14 @@ function scoreRows() {
 }
 function buildScores() {
   const { rows, hasPy, pr } = scoreRows(), t = $("scoreTable");
-  t.innerHTML = `<thead><tr><th></th><th colspan="3" class="who-a">Aimed at the man</th><th colspan="3" class="who-b">Aimed at the woman</th></tr>
-    <tr><th>Processing</th><th>Score</th><th>Gain</th><th>Python</th><th>Score</th><th>Gain</th><th>Python</th></tr></thead><tbody></tbody>`;
+  t.innerHTML = `<colgroup><col class="c-proc"><col><col><col><col><col><col></colgroup>
+    <thead><tr><th></th><th colspan="3" class="who-a g">Aimed at the man</th><th colspan="3" class="who-b g">Aimed at the woman</th></tr>
+    <tr><th>Processing</th><th class="g">Score</th><th>Gain</th><th>Python</th><th class="g">Score</th><th>Gain</th><th>Python</th></tr></thead><tbody></tbody>`;
   const tb = t.querySelector("tbody");
   for (const r of rows) {
     const tr = document.createElement("tr"); if (r.k === "mic") tr.className = "orig";
     tr.innerHTML = `<td>${r.label}</td>` + ["man", "woman"].map(w =>
-      `<td><b>${fmt(r[w])} dB</b></td><td>${r[w + "Gain"] == null ? "" : fmt(r[w + "Gain"]) + " dB"}</td><td class="py">${r[w + "Py"] == null ? "—" : fmt(r[w + "Py"]) + " dB"}</td>`).join("");
+      `<td class="g"><b>${fmt(r[w])} dB</b></td><td>${r[w + "Gain"] == null ? "" : fmt(r[w + "Gain"]) + " dB"}</td><td class="py">${r[w + "Py"] == null ? "—" : fmt(r[w + "Py"]) + " dB"}</td>`).join("");
     tb.appendChild(tr);
   }
   $("scoreNote").textContent = hasPy
@@ -919,8 +940,9 @@ function fetchRaw(path) {
 function buildPyList() {
   const root = $("pyList");
   for (const grp of PY_FILES) {
-    const box = document.createElement("div"); box.className = "lgroup";
-    const h = document.createElement("h3"); h.textContent = grp.title; box.appendChild(h);
+    const box = document.createElement("details"); box.className = "lgroup";
+    if (root.children.length < 2) box.open = true;
+    const h = document.createElement("summary"); h.innerHTML = `<h3></h3><small>${grp.files.length} files</small>`; h.querySelector("h3").textContent = grp.title; box.appendChild(h);
     const ol = document.createElement("ol"); ol.className = "tracks"; box.appendChild(ol);
     const err = document.createElement("p"); err.className = "err"; err.hidden = true;
     err.textContent = "Couldn't load this file. The list works on the published page, or when the repo folder is served by a local web server (python -m http.server).";
