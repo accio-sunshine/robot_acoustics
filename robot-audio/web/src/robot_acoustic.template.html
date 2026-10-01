@@ -138,6 +138,18 @@ ol.tracks li.sel { background: var(--bg); box-shadow: inset 3px 0 0 var(--mic); 
 .lgroup { display: grid; gap: 6px; }
 .lgroup + .lgroup { margin-top: 10px; }
 .err { color: var(--bad); font-size: .84rem; margin: 0; }
+.tablewrap { overflow-x: auto; }
+#scoreTable { border-collapse: collapse; width: 100%; min-width: 560px; font-variant-numeric: tabular-nums; font-size: .9rem; }
+#scoreTable th, #scoreTable td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+#scoreTable th:first-child, #scoreTable td:first-child { text-align: left; white-space: normal; }
+#scoreTable thead th { font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--soft); font-weight: 600; }
+#scoreTable thead tr:first-child th { border-bottom: 0; padding-bottom: 0; }
+#scoreTable .who-a { color: var(--a); } #scoreTable .who-b { color: var(--b); }
+#scoreTable td.py { color: var(--soft); font-family: var(--mono); font-size: .82rem; }
+#scoreTable tr.orig td { background: var(--bg); }
+#scoreTable td b { font-weight: 600; }
+.dl { flex: 0 0 auto; width: 38px; height: 38px; padding: 0; display: grid; place-items: center; }
+.dl svg { width: 14px; height: 14px; }
 .check-box { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 8px; }
 .check-box summary { cursor: pointer; font-weight: 600; font-size: .92rem; }
 .check-box[open] { gap: 10px; }
@@ -168,7 +180,7 @@ code { font-family: var(--mono); font-size: .82em; }
         <li><b>Listen to the raw microphones.</b> Press Play selected mics. Click microphones on the head to choose which ones you hear, and use Stereo with headphones to hear left and right.</li>
         <li><b>Compare the processing.</b> Under Pick out each speaker, play Mic 1 alone, then the beamformers aimed at the man or the woman. The dB score is the target voice against everything else, so higher means cleaner.</li>
         <li><b>Look at the sound.</b> Clicking any row shows its waveform and spectrogram under the timeline. Click the picture to play from that moment.</li>
-        <li><b>Check against Python.</b> Play the Python recordings, and compare the page's scores with the Python numbers shown for the Baby crying and Baby + fan scenes.</li>
+        <li><b>Read the scores.</b> The Scores table shows each method against the original (mic 1 alone), and the Python numbers for the Baby crying and Baby + fan scenes. Download any sound with ↓, or everything with Download all.</li>
       </ol>
     </div>
   </section>
@@ -212,6 +224,16 @@ code { font-family: var(--mono); font-size: .82em; }
       <div class="knobs" id="knobs"></div>
     </section>
   </div>
+
+  <section aria-labelledby="h-scores">
+    <div class="vhead">
+      <h2 id="h-scores">Scores</h2>
+      <button id="dlAll" disabled>Download all audio + scores (.zip)</button>
+    </div>
+    <p class="hint">Each score is how much stronger the target voice is than everything else at that point, in dB. <b>The original</b> is Mic 1 alone: what one microphone hears with no processing. <b>Gain</b> is how much the processing improves on the original. +3 dB means the voice is about twice as strong relative to the noise, and +10 dB means ten times.</p>
+    <div class="tablewrap"><table id="scoreTable"></table></div>
+    <p class="hint" id="scoreNote"></p>
+  </section>
 
   <section aria-labelledby="h-view">
     <div class="vhead">
@@ -489,7 +511,7 @@ function onWorker(d) {
   RES = d.res;
   buffers = {};
   srpPeaks = RES.srp.peaks;
-  drawHead(); buildLists(); drawTimeline();
+  drawHead(); buildLists(); buildScores(); drawTimeline();
   setStatus(false, queued ? "Updating…" : `Rendered in ${(RES.ms / 1000).toFixed(1)} s.`);
   if (!view || view.src !== "py") selectTrack(view ? view.key : "mic1", false);
   const truth = [["man", P.manAng], ["woman", P.womanAng]].concat(P.babyOn ? [["baby", P.babyAng]] : []);
@@ -507,16 +529,54 @@ function changed(now) {
 // the mic mix uses Web Audio. Both are unlocked on the first tap, inside the gesture.
 let ctx = null, buffers = {}, playing = null, stereo = false, player = null, unlocked = false;
 const PLAY = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z" fill="currentColor"/></svg>';
+const DL = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.5v7.5M3.5 6 7 9.5 10.5 6M2 12.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const STOP = '<svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="1" fill="currentColor"/></svg>';
 function audioCtx() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); return ctx; }
-function wavBlob(arr, rate = 16000) {
+function wavBlob(arr, rate = 16000) { return new Blob([wavBytes(arr, rate)], { type: "audio/wav" }); }
+function wavBytes(arr, rate = 16000) {
   const n = arr.length, b = new ArrayBuffer(44 + 2 * n), v = new DataView(b);
   const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
   w(0, "RIFF"); v.setUint32(4, 36 + 2 * n, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true);
   v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
   v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, 2 * n, true);
   for (let i = 0; i < n; i++) v.setInt16(44 + 2 * i, Math.max(-1, Math.min(1, arr[i])) * 32767, true);
-  return new Blob([b], { type: "audio/wav" });
+  return new Uint8Array(b);
+}
+// ---- downloads: the Claude viewer saves .zip (not .wav), so audio goes inside a zip there
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u) { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = CRC[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function makeZip(files) {                       // files: [{name, data: Uint8Array}], stored (no compression)
+  const enc = new TextEncoder(), parts = [], central = [];
+  let off = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), crc = crc32(f.data), h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true);
+    h.setUint32(14, crc, true); h.setUint32(18, f.data.length, true); h.setUint32(22, f.data.length, true); h.setUint16(26, name.length, true);
+    parts.push(new Uint8Array(h.buffer), name, f.data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true);
+    c.setUint32(16, crc, true); c.setUint32(20, f.data.length, true); c.setUint32(24, f.data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), name);
+    off += 30 + name.length + f.data.length;
+  }
+  const size = central.reduce((a, u) => a + u.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, size, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type: "application/zip" });
+}
+const downloadsP = window.claude && window.claude.use ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
+function plainDownload(name, blob) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+async function offerFiles(zipName, files) {
+  const dl = await downloadsP;
+  if (dl) {
+    try { await dl.save({ filename: zipName, data: makeZip(files) }); setStatus(false, `Saved ${zipName}.`); }
+    catch (e) { if (e && e.code !== "declined") setStatus(false, `Couldn't save the file: ${e.message || e.code}.`); }
+    return;
+  }
+  if (files.length === 1) plainDownload(files[0].name, new Blob([files[0].data], { type: files[0].name.endsWith(".wav") ? "audio/wav" : "text/plain" }));
+  else plainDownload(zipName, makeZip(files));
 }
 const SILENT = URL.createObjectURL(wavBlob(new Float32Array(1600)));
 function wavDataUri(arr) {
@@ -750,6 +810,11 @@ function trackRow(list, o) {
     s.innerHTML = `<b>${o.score >= 0 ? "+" : "−"}${Math.abs(o.score).toFixed(1)}</b> dB` + (o.py != null ? `<span class="py">Python ${o.py >= 0 ? "+" : "−"}${Math.abs(o.py).toFixed(1)}</span>` : "");
     li.appendChild(s);
   }
+  if (o.file) {
+    const d = document.createElement("button"); d.className = "dl"; d.innerHTML = DL; d.setAttribute("aria-label", "Download " + o.label); d.title = "Download";
+    d.addEventListener("click", e => { e.stopPropagation(); (o.bytes ? o.bytes() : o.get().then(a => a && wavBytes(a))).then(u => { if (u) offerFiles(o.file.replace(/\.wav$/, ".zip"), [{ name: o.file, data: u }]); }); });
+    li.appendChild(d);
+  }
   const btn = document.createElement("button"); btn.className = "play"; btn.innerHTML = PLAY; btn.setAttribute("aria-label", "Play " + o.label);
   li.appendChild(btn);
   const name = o.viewName || o.label;
@@ -763,21 +828,71 @@ function buildLists() {
   const pr = PRESETS.find(x => x.id === presetId), py = presetMatches() && pr.py ? pr.py : {};
   const S = RES.scores, bl = $("beamList"); bl.textContent = "";
   const page = a => () => Promise.resolve(a);
-  trackRow(bl, { key: "mic1", label: "Mic 1 alone", desc: "Everything, as one microphone hears it. Score for the man.", score: S.mic_man, py: py.mic_man, badge: "1", color: "var(--mic)", get: page(RES.tracks.mic1), src: "page" });
+  trackRow(bl, { key: "mic1", file: "mic1_original.wav", label: "Mic 1 alone", desc: "Everything, as one microphone hears it. Score for the man.", score: S.mic_man, py: py.mic_man, badge: "1", color: "var(--mic)", get: page(RES.tracks.mic1), src: "page" });
   for (const [who, c, badge] of [["man", "var(--a)", "M"], ["woman", "var(--b)", "W"]]) {
     const items = [["das", "Delay-and-sum", "Lines up the 8 mics toward the " + who + "."], ["mvdr", "MVDR beamformer", "Also turns down sounds from other directions."], ["learned", "MVDR, learned robot noise", "Also learned from the robot moving with nobody talking."]];
     for (const [k, label, desc] of items) {
       const id = `${who}_${k}`;
       if (!RES.tracks[id]) continue;
-      trackRow(bl, { key: id, label: `${label} at the ${who}`, desc, score: S[id], py: py[id], badge, color: c, get: page(RES.tracks[id]), src: "page" });
+      trackRow(bl, { key: id, file: `${id}.wav`, label: `${label} at the ${who}`, desc, score: S[id], py: py[id], badge, color: c, get: page(RES.tracks[id]), src: "page" });
     }
   }
   const sl = $("soloList"); sl.textContent = "";
   const solos = [["man", "The man", "var(--a)", "M"], ["woman", "The woman", "var(--b)", "W"], ["baby", "The baby", "var(--baby)", "B"]]
     .concat(NOISES.map(n => [n.k, n.label, "var(--noise)", ""]));
-  for (const [k, label, c, b] of solos) if (RES.solos[k]) trackRow(sl, { key: "solo_" + k, label, desc: k === "footsteps" ? "Approximate." : "", badge: b, color: c, get: page(RES.solos[k]), src: "page" });
+  for (const [k, label, c, b] of solos) if (RES.solos[k]) trackRow(sl, { key: "solo_" + k, file: `alone_${k}.wav`, label, desc: k === "footsteps" ? "Approximate." : "", badge: b, color: c, get: page(RES.solos[k]), src: "page" });
   if (view) document.querySelectorAll("ol.tracks li").forEach(li => li.classList.toggle("sel", li.dataset.key === view.key));
 }
+const SCORE_ROWS = [["mic", "Mic 1 alone (the original)"], ["das", "Delay-and-sum"], ["mvdr", "MVDR beamformer"], ["learned", "MVDR, learned robot noise"]];
+function fmt(v) { return v == null ? "—" : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}`; }
+function scoreRows() {
+  const pr = PRESETS.find(x => x.id === presetId), py = presetMatches() && pr.py ? pr.py : {}, S = RES.scores, out = [];
+  for (const [k, label] of SCORE_ROWS) {
+    const get = who => k === "mic" ? S["mic_" + who] : S[`${who}_${k}`];
+    if (get("man") == null) continue;
+    const row = { label, k };
+    for (const who of ["man", "woman"]) {
+      row[who] = get(who); row[who + "Gain"] = k === "mic" ? null : get(who) - S["mic_" + who];
+      row[who + "Py"] = k === "mic" ? py["mic_" + who] : py[`${who}_${k}`];
+    }
+    out.push(row);
+  }
+  return { rows: out, hasPy: Object.keys(py).length > 0, pr };
+}
+function buildScores() {
+  const { rows, hasPy, pr } = scoreRows(), t = $("scoreTable");
+  t.innerHTML = `<thead><tr><th></th><th colspan="3" class="who-a">Aimed at the man</th><th colspan="3" class="who-b">Aimed at the woman</th></tr>
+    <tr><th>Processing</th><th>Score</th><th>Gain</th><th>Python</th><th>Score</th><th>Gain</th><th>Python</th></tr></thead><tbody></tbody>`;
+  const tb = t.querySelector("tbody");
+  for (const r of rows) {
+    const tr = document.createElement("tr"); if (r.k === "mic") tr.className = "orig";
+    tr.innerHTML = `<td>${r.label}</td>` + ["man", "woman"].map(w =>
+      `<td><b>${fmt(r[w])} dB</b></td><td>${r[w + "Gain"] == null ? "" : fmt(r[w + "Gain"]) + " dB"}</td><td class="py">${r[w + "Py"] == null ? "—" : fmt(r[w + "Py"]) + " dB"}</td>`).join("");
+    tb.appendChild(tr);
+  }
+  $("scoreNote").textContent = hasPy
+    ? `Python column: the same scene from sim_conversation.py (pyroomacoustics). The page's numbers should land within about 0.5 dB.`
+    : `Python numbers exist only for the “Baby crying” and “Baby + fan” scenes with their default knobs. Pick one of those to compare.`;
+  $("dlAll").disabled = false;
+}
+function scoresCsv() {
+  const { rows } = scoreRows();
+  const lines = ["processing,man_score_db,man_gain_db,man_python_db,woman_score_db,woman_gain_db,woman_python_db"];
+  const f = v => v == null ? "" : v.toFixed(2);
+  for (const r of rows) lines.push([`"${r.label}"`, f(r.man), f(r.manGain), f(r.manPy), f(r.woman), f(r.womanGain), f(r.womanPy)].join(","));
+  return lines.join("\n") + "\n";
+}
+$("dlAll").addEventListener("click", () => {
+  if (!RES) return;
+  const enc = new TextEncoder(), files = [];
+  RES.mics.forEach((m, i) => files.push({ name: `mics/mic${i + 1}.wav`, data: wavBytes(m) }));
+  files.push({ name: "mic1_original.wav", data: wavBytes(RES.tracks.mic1) });
+  for (const k in RES.tracks) if (k !== "mic1") files.push({ name: `beams/${k}.wav`, data: wavBytes(RES.tracks[k]) });
+  for (const k in RES.solos) files.push({ name: `alone/${k}.wav`, data: wavBytes(RES.solos[k]) });
+  files.push({ name: "scores.csv", data: enc.encode(scoresCsv()) });
+  files.push({ name: "settings.json", data: enc.encode(JSON.stringify(P, null, 2) + "\n") });
+  offerFiles(`robot_acoustic_${presetMatches() ? presetId : "custom"}.zip`, files);
+});
 function selectTrack(key, play) {
   const map = { ...RES.tracks }; for (const k in RES.solos) map["solo_" + k] = RES.solos[k];
   if (key === "mics") { showArray("mics", "Selected microphones", micDesc(), micSum(), "page"); return; }
@@ -797,6 +912,10 @@ function fetchWav(path) {
     .catch(() => { delete pyCache[path]; return null; });
   return pyCache[path];
 }
+function fetchRaw(path) {
+  const tryUrl = u => fetch(u).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); });
+  return tryUrl("audio/" + path).catch(() => tryUrl("../" + path)).then(b => new Uint8Array(b)).catch(() => null);
+}
 function buildPyList() {
   const root = $("pyList");
   for (const grp of PY_FILES) {
@@ -806,7 +925,7 @@ function buildPyList() {
     const err = document.createElement("p"); err.className = "err"; err.hidden = true;
     err.textContent = "Couldn't load this file. The list works on the published page, or when the repo folder is served by a local web server (python -m http.server).";
     for (const f of grp.files) {
-      trackRow(ol, { key: "py_" + f.path, label: f.label, viewName: `Python · ${grp.title} · ${f.label}`, desc: f.path.split("/").pop(), badge: "py", color: "var(--soft)", src: "py",
+      trackRow(ol, { key: "py_" + f.path, file: f.path.split("/").pop(), bytes: () => fetchRaw(f.path), label: f.label, viewName: `Python · ${grp.title} · ${f.label}`, desc: f.path.split("/").pop(), badge: "py", color: "var(--soft)", src: "py",
         get: () => fetchWav(f.path).then(a => { err.hidden = !!a; return a; }) });
     }
     box.appendChild(err);
