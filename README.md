@@ -118,6 +118,9 @@ scenes, then confirm in Python.
 
 ## Robot Acoustic page
 
+**Live site:** https://accio-sunshine.github.io/robot_acoustics/ (8-Mic Array Bench at `/array_bench.html`).
+It is rebuilt and published by `.github/workflows/pages.yml` on every push to `main`.
+
 `web/robot_acoustic.html` is the conversation scene from the robot's point of view. The robot's head is in
 the middle with its 8 mics, the man, woman and baby can be dragged around it, and every robot noise (fan,
 neck servo, shoulder servos, brake clicks, 50 Hz hum, footsteps) has an on/off switch and a loudness knob,
