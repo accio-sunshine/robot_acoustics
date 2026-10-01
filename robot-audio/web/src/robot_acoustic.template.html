@@ -131,6 +131,10 @@ ol.tracks li.sel { background: var(--bg); box-shadow: inset 3px 0 0 var(--mic); 
 .lgroup { display: grid; gap: 6px; }
 .lgroup + .lgroup { margin-top: 10px; }
 .err { color: var(--bad); font-size: .84rem; margin: 0; }
+.check-box { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 8px; }
+.check-box summary { cursor: pointer; font-weight: 600; font-size: .92rem; }
+.check-box[open] { gap: 10px; }
+#beepOut { font-family: var(--mono); font-size: .78rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 footer { color: var(--soft); font-size: .86rem; max-width: 78ch; display: grid; gap: 8px; }
 footer p { margin: 0; }
 code { font-family: var(--mono); font-size: .82em; }
@@ -163,6 +167,16 @@ code { font-family: var(--mono); font-size: .82em; }
         <button id="stereo" aria-pressed="false">Stereo for headphones</button>
       </div>
       <div class="status" id="status" aria-live="polite"></div>
+      <details class="check-box" id="soundCheck">
+        <summary>Can't hear anything? Run the sound check</summary>
+        <p class="hint">Each button plays a one-second beep a different way. Tell Claude which ones you hear and what the line under them says.</p>
+        <div class="row">
+          <button id="beep1">Beep 1: audio player</button>
+          <button id="beep2">Beep 2: embedded file</button>
+          <button id="beep3">Beep 3: Web Audio</button>
+        </div>
+        <p class="hint" id="beepOut" aria-live="polite"></p>
+      </details>
     </section>
 
     <section aria-labelledby="h-knobs">
@@ -479,6 +493,9 @@ function wavBlob(arr, rate = 16000) {
   return new Blob([b], { type: "audio/wav" });
 }
 const SILENT = URL.createObjectURL(wavBlob(new Float32Array(1600)));
+function wavDataUri(arr) {
+  return new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(wavBlob(arr)); });
+}
 function unlock() {
   if (unlocked) return;
   unlocked = true;
@@ -521,7 +538,12 @@ function playArray(key, arr, btn, offset = 0) {
     el.onended = () => { if (playing && playing.el === el) stopAll(); };
     el.src = url;
     const go = () => { try { el.currentTime = offset; } catch (_) {} const p = el.play(); return p && p.then ? p : Promise.resolve(); };
-    go().then(mark).catch(err => { if (playing && playing.el === el) { playing.el = null; playWebAudio(key, arr, btn, offset, err); } });
+    // blob URL first; if the page blocks it, try an embedded data: URL, then Web Audio
+    go().then(mark).catch(err => {
+      if (!playing || playing.el !== el) return;
+      wavDataUri(arr).then(uri => { el.src = uri; return go(); }).then(mark)
+        .catch(err2 => { if (playing && playing.el === el) { playing.el = null; playWebAudio(key, arr, btn, offset, err2 || err); } });
+    });
     return;
   }
   playWebAudio(key, arr, btn, offset);
@@ -765,6 +787,33 @@ function buildPyList() {
     root.appendChild(box);
   }
 }
+
+// ---------------------------------------------------------------- sound check
+const beepArr = Float32Array.from({ length: 16000 }, (_, i) => 0.4 * Math.sin(2 * Math.PI * 660 * i / 16000) * Math.min(1, i / 400, (16000 - i) / 400));
+function beepLog(msg) { $("beepOut").textContent = msg + `\nAudio engine: ${ctx ? ctx.state + ", " + ctx.sampleRate + " Hz" : "not started"} · ${navigator.userAgent}`; }
+$("beep1").addEventListener("click", () => {
+  stopAll();
+  const a = new Audio(URL.createObjectURL(wavBlob(beepArr)));
+  a.onerror = () => beepLog("Beep 1: the audio player could not load the sound (error " + (a.error && a.error.code) + ").");
+  const p = a.play();
+  (p && p.then ? p : Promise.resolve()).then(() => beepLog("Beep 1: playing through the audio player.")).catch(e => beepLog("Beep 1 blocked: " + e.name + " " + e.message));
+});
+$("beep2").addEventListener("click", () => {
+  stopAll();
+  const a = new Audio();
+  wavDataUri(beepArr).then(uri => { a.src = uri; return a.play(); })
+    .then(() => beepLog("Beep 2: playing an embedded file.")).catch(e => beepLog("Beep 2 blocked: " + e.name + " " + e.message));
+});
+$("beep3").addEventListener("click", () => {
+  stopAll();
+  try {
+    const c = audioCtx();
+    const o = c.createOscillator(), g = c.createGain();
+    g.gain.value = 0.25; o.frequency.value = 660; o.connect(g).connect(c.destination);
+    o.start(); o.stop(c.currentTime + 1);
+    c.resume().then(() => beepLog("Beep 3: Web Audio is " + c.state + ".")).catch(e => beepLog("Beep 3 blocked: " + e.name + " " + e.message));
+  } catch (e) { beepLog("Beep 3 failed: " + e.name + " " + e.message); }
+});
 
 // ---------------------------------------------------------------- start
 buildKnobs(); syncKnobs(); drawHead(); drawTimeline(); buildPyList();
